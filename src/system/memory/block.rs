@@ -22,22 +22,31 @@ pub struct MemoryBlockManager<T, R, W, const C: usize> {
 }
 
 impl<'a> FreeMemoryRange<'a> {
-    fn into_claimed(self) -> ClaimedMemoryRange<'a> {
-        unsafe { ClaimedMemoryRange::new(self.chunk, self.start) }
+    // Claim this memory range, preventing the memory manager from
+    // allocating it again until the returned ClaimedMemoryRange
+    // object is dropped.
+    // This is marked as unsafe because it assumes that no other
+    // overlapping FreeMemoryRange exists. If this assumption is false
+    // then this will lead to undefined behaviour.
+    unsafe fn into_claimed(self) -> ClaimedMemoryRange<'a> {
+        ClaimedMemoryRange::new(self.chunk, self.start)
     }
 }
 
 impl<'a> ClaimedMemoryRange<'a> {
+    // Claim this memory range, preventing the memory manager from
+    // allocating it again until the object is dropped.
+    // This is marked as unsafe because it assumes that no other
+    // overlapping FreeMemoryRange exists. If this assumption is false
+    // then this will lead to undefined behaviour.
     unsafe fn new(chunk: &'a [bool], start: usize) -> ClaimedMemoryRange<'a> {
         for i in 0..chunk.len() {
             let e = chunk.get(i).unwrap();
             let e_ptr = e as *const bool;
             let e_ptr = e_ptr.cast_mut();
 
-            unsafe {
-                assert!(*e_ptr == false);
-                *e_ptr = true;
-            }
+            assert!(*e_ptr == false);
+            *e_ptr = true;
         }
 
         ClaimedMemoryRange { chunk, start }
@@ -133,8 +142,12 @@ impl<T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
 
     pub fn request_memory(&mut self, size: usize) -> ClaimedVolRegion<T, R, W> {
         let block = self.block;
-        self.find_available_memory_range(size)
-            .into_claimed()
-            .into_claimed_vol_region(block)
+        // This is safe so long as this is the only method that ever constructs
+        // FreeMemoryRanges. The struct itself is private so this assumption holds true.
+        unsafe {
+            self.find_available_memory_range(size)
+                .into_claimed()
+                .into_claimed_vol_region(block)
+        }
     }
 }
