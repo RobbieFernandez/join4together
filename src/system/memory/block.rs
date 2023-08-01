@@ -1,69 +1,64 @@
-use core::ops::Range;
+use core::{cell::RefCell, ops::Range};
 use voladdress::{VolBlock, VolRegion};
 
-struct FreeMemoryRange<'a> {
-    chunk: &'a [bool],
+struct FreeMemoryRange<'a, const C: usize> {
+    allocation_arr: &'a RefCell<[bool; C]>,
     start: usize,
+    length: usize,
 }
 
-struct ClaimedMemoryRange<'a> {
-    chunk: &'a [bool],
+struct ClaimedMemoryRange<'a, const C: usize> {
+    allocation_arr: &'a RefCell<[bool; C]>,
     start: usize,
+    length: usize,
 }
 
-pub struct ClaimedVolRegion<'a, T, R, W> {
-    memory_range: ClaimedMemoryRange<'a>,
+pub struct ClaimedVolRegion<'a, T, R, W, const C: usize> {
+    memory_range: ClaimedMemoryRange<'a, C>,
     vol_region: VolRegion<T, R, W>,
 }
 
 pub struct MemoryBlockManager<T, R, W, const C: usize> {
     block: VolBlock<T, R, W, C>,
-    allocation_arr: [bool; C],
+    allocation_arr: RefCell<[bool; C]>,
 }
 
-impl<'a> FreeMemoryRange<'a> {
-    // Claim this memory range, preventing the memory manager from
-    // allocating it again until the returned ClaimedMemoryRange
-    // object is dropped.
-    // This is marked as unsafe because it assumes that no other
-    // overlapping FreeMemoryRange exists. If this assumption is false
-    // then this will lead to undefined behaviour.
-    unsafe fn into_claimed(self) -> ClaimedMemoryRange<'a> {
-        ClaimedMemoryRange::new(self.chunk, self.start)
+impl<'a, const C: usize> FreeMemoryRange<'a, C> {
+    fn into_claimed(self) -> ClaimedMemoryRange<'a, C> {
+        ClaimedMemoryRange::new(self.allocation_arr, self.start, self.length)
     }
 }
 
-impl<'a> ClaimedMemoryRange<'a> {
+impl<'a, const C: usize> ClaimedMemoryRange<'a, C> {
     // Claim this memory range, preventing the memory manager from
     // allocating it again until the object is dropped.
-    // This is marked as unsafe because it assumes that no other
-    // overlapping FreeMemoryRange exists. If this assumption is false
-    // then this will lead to undefined behaviour.
-    unsafe fn new(chunk: &'a [bool], start: usize) -> ClaimedMemoryRange<'a> {
-        for i in 0..chunk.len() {
-            let e = chunk.get(i).unwrap();
-            let e_ptr = e as *const bool;
-            let e_ptr = e_ptr.cast_mut();
+    fn new(
+        allocation_arr_cell: &'a RefCell<[bool; C]>,
+        start: usize,
+        length: usize,
+    ) -> ClaimedMemoryRange<'a, C> {
+        let mut allocation_arr = allocation_arr_cell.borrow_mut();
 
-            assert!(*e_ptr == false);
-            *e_ptr = true;
+        for i in 0..length {
+            let e = allocation_arr.get_mut(i).unwrap();
+            assert!(*e == false);
+            *e = true;
         }
 
-        ClaimedMemoryRange { chunk, start }
+        ClaimedMemoryRange {
+            allocation_arr: allocation_arr_cell,
+            start,
+            length,
+        }
     }
-
-    fn len(&self) -> usize {
-        self.chunk.len()
-    }
-
     fn address_range(&self) -> Range<usize> {
-        self.start..(self.start + self.len())
+        self.start..(self.start + self.length)
     }
 
-    fn into_claimed_vol_region<T, R, W, const C: usize>(
+    fn into_claimed_vol_region<T, R, W>(
         self,
         block: VolBlock<T, R, W, C>,
-    ) -> ClaimedVolRegion<'a, T, R, W> {
+    ) -> ClaimedVolRegion<'a, T, R, W, C> {
         let addr_range = self.address_range();
         let region = block.as_region();
 
@@ -74,22 +69,19 @@ impl<'a> ClaimedMemoryRange<'a> {
     }
 }
 
-impl<'a> Drop for ClaimedMemoryRange<'a> {
+impl<'a, const C: usize> Drop for ClaimedMemoryRange<'a, C> {
     fn drop(&mut self) {
-        for i in 0..self.chunk.len() {
-            let e = self.chunk.get(i).unwrap();
-            let e_ptr = e as *const bool;
-            let e_ptr = e_ptr.cast_mut();
+        let mut allocation_arr = self.allocation_arr.borrow_mut();
 
-            unsafe {
-                assert!(*e_ptr == true);
-                *e_ptr = false;
-            }
+        for i in 0..self.length {
+            let e = allocation_arr.get_mut(i).unwrap();
+            assert!(*e);
+            *e = false;
         }
     }
 }
 
-impl<'a, T, R, W> ClaimedVolRegion<'a, T, R, W> {
+impl<'a, T, R, W, const C: usize> ClaimedVolRegion<'a, T, R, W, C> {
     pub fn as_vol_region(&mut self) -> &VolRegion<T, R, W> {
         &self.vol_region
     }
@@ -99,7 +91,7 @@ impl<'a, T, R, W> ClaimedVolRegion<'a, T, R, W> {
     }
 
     pub fn len(&self) -> usize {
-        self.memory_range.len()
+        self.memory_range.length
     }
 }
 
@@ -107,7 +99,7 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
     pub fn new(block: VolBlock<T, R, W, C>) -> Self {
         Self {
             block,
-            allocation_arr: [false; C],
+            allocation_arr: RefCell::new([false; C]),
         }
     }
 
@@ -115,13 +107,14 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
         &self,
         alignment: usize,
         requested_aligned_chunks: usize,
-    ) -> FreeMemoryRange {
+    ) -> FreeMemoryRange<C> {
         let mut pos = 0; // The index of the last seen aligned chunk
         let num_chunks = C / alignment;
+        let allocation_arr = self.allocation_arr.borrow();
 
-        while pos < self.allocation_arr.len() {
+        while pos < allocation_arr.len() {
             let chunk_pos = pos * alignment;
-            let mut chunk_iter = (&self.allocation_arr[chunk_pos..]).chunks_exact(alignment);
+            let mut chunk_iter = (&allocation_arr[chunk_pos..]).chunks_exact(alignment);
 
             // Find first chunk that contains unclaimed memory.
             let starting_chunk_index = chunk_iter
@@ -140,11 +133,12 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
 
             if num_free_chunks >= requested_aligned_chunks {
                 let start_of_range = starting_chunk_index * alignment;
-                let end_of_range = start_of_range + requested_aligned_chunks * alignment;
+                let length = requested_aligned_chunks * alignment;
 
                 return FreeMemoryRange {
-                    chunk: &self.allocation_arr[start_of_range..end_of_range],
+                    allocation_arr: &self.allocation_arr,
                     start: start_of_range,
+                    length,
                 };
             }
 
@@ -157,7 +151,7 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
         panic!("Out of memory!");
     }
 
-    pub fn request_memory(&self, size: usize) -> ClaimedVolRegion<T, R, W> {
+    pub fn request_memory(&self, size: usize) -> ClaimedVolRegion<T, R, W, C> {
         self.request_aligned_memory(1, size)
     }
 
@@ -165,14 +159,12 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
         &'a self,
         alignment: usize,
         aligned_chunks: usize,
-    ) -> ClaimedVolRegion<'a, T, R, W> {
+    ) -> ClaimedVolRegion<'a, T, R, W, C> {
         let block = self.block;
         // This is safe so long as this is the only method that ever constructs
         // FreeMemoryRanges. The struct itself is private so this assumption holds true.
-        unsafe {
-            self.find_available_memory_range(alignment, aligned_chunks)
-                .into_claimed()
-                .into_claimed_vol_region(block)
-        }
+        self.find_available_memory_range(alignment, aligned_chunks)
+            .into_claimed()
+            .into_claimed_vol_region(block)
     }
 }

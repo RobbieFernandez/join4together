@@ -1,53 +1,50 @@
-use core::marker::PhantomData;
+use core::cell::RefCell;
 
 // use core::ops::Range;
 use voladdress::{VolAddress, VolSeries};
 
-struct FreeMemorySlot<'a> {
-    alloc_ptr: *mut bool,
+struct FreeMemorySlot<'a, const C: usize> {
+    allocation_arr: &'a RefCell<[bool; C]>,
     index: usize,
-    _phantom: PhantomData<&'a ()>,
 }
 
-struct ClaimedMemorySlot<'a> {
-    alloc_ptr: *mut bool,
+struct ClaimedMemorySlot<'a, const C: usize> {
+    allocation_arr: &'a RefCell<[bool; C]>,
     index: usize,
-    _phantom: PhantomData<&'a ()>,
 }
 
-pub struct ClaimedVolAddress<'a, T, R, W> {
-    memory_slot: ClaimedMemorySlot<'a>,
+pub struct ClaimedVolAddress<'a, T, R, W, const C: usize> {
+    memory_slot: ClaimedMemorySlot<'a, C>,
     vol_address: VolAddress<T, R, W>,
 }
 
 pub struct MemorySeriesManager<T, R, W, const C: usize, const S: usize> {
     series: VolSeries<T, R, W, C, S>,
-    allocation_arr: [bool; C],
+    allocation_arr: RefCell<[bool; C]>,
 }
 
-impl<'a> FreeMemorySlot<'a> {
-    fn into_claimed(self) -> ClaimedMemorySlot<'a> {
-        unsafe { ClaimedMemorySlot::new(self.alloc_ptr, self.index) }
+impl<'a, const C: usize> FreeMemorySlot<'a, C> {
+    fn into_claimed(self) -> ClaimedMemorySlot<'a, C> {
+        ClaimedMemorySlot::new(self.allocation_arr, self.index)
     }
 }
 
-impl<'a> ClaimedMemorySlot<'a> {
-    unsafe fn new(alloc_ptr: *mut bool, index: usize) -> ClaimedMemorySlot<'a> {
-        unsafe {
-            assert!(*alloc_ptr == false);
-            *alloc_ptr = true;
-        }
+impl<'a, const C: usize> ClaimedMemorySlot<'a, C> {
+    fn new(allocation_arr_cell: &'a RefCell<[bool; C]>, index: usize) -> ClaimedMemorySlot<'a, C> {
+        let mut allocation_arr = allocation_arr_cell.borrow_mut();
+        let alloc = allocation_arr.get_mut(index).unwrap();
+        assert!(!*alloc);
+        *alloc = true;
         ClaimedMemorySlot {
-            alloc_ptr,
             index,
-            _phantom: PhantomData,
+            allocation_arr: allocation_arr_cell,
         }
     }
 
-    fn into_claimed_vol_address<T, R, W, const C: usize, const S: usize>(
+    fn into_claimed_vol_address<T, R, W, const S: usize>(
         self,
         series: VolSeries<T, R, W, C, S>,
-    ) -> ClaimedVolAddress<'a, T, R, W> {
+    ) -> ClaimedVolAddress<'a, T, R, W, C> {
         let vol_address = series.index(self.index);
         ClaimedVolAddress {
             memory_slot: self,
@@ -56,16 +53,16 @@ impl<'a> ClaimedMemorySlot<'a> {
     }
 }
 
-impl<'a> Drop for ClaimedMemorySlot<'a> {
+impl<'a, const C: usize> Drop for ClaimedMemorySlot<'a, C> {
     fn drop(&mut self) {
-        unsafe {
-            assert!(*self.alloc_ptr == true);
-            *self.alloc_ptr = false;
-        }
+        let mut allocation_arr = self.allocation_arr.borrow_mut();
+        let alloc = allocation_arr.get_mut(self.index).unwrap();
+        assert!(*alloc);
+        *alloc = false;
     }
 }
 
-impl<'a, T, R, W> ClaimedVolAddress<'a, T, R, W> {
+impl<'a, T, R, W, const C: usize> ClaimedVolAddress<'a, T, R, W, C> {
     pub fn as_vol_address(&'a mut self) -> &'a VolAddress<T, R, W> {
         &self.vol_address
     }
@@ -79,33 +76,31 @@ impl<T, R, W, const C: usize, const S: usize> MemorySeriesManager<T, R, W, C, S>
     pub fn new(series: VolSeries<T, R, W, C, S>) -> Self {
         Self {
             series,
-            allocation_arr: [false; C],
+            allocation_arr: RefCell::new([false; C]),
         }
     }
 
-    unsafe fn find_available_memory_slot(&self) -> FreeMemorySlot {
-        let iter = &mut self.allocation_arr.iter();
+    fn find_available_memory_slot(&self) -> FreeMemorySlot<C> {
+        let next_slot = {
+            let allocation_arr = self.allocation_arr.borrow();
+            let mut iter = allocation_arr.iter();
 
-        let next_slot = match iter.position(|e| !e) {
-            Some(n) => n,
-            _ => panic!("Out of memory"),
+            match iter.position(|e| !e) {
+                Some(n) => n,
+                _ => panic!("Out of memory"),
+            }
         };
 
-        let alloc_ptr: *const bool = &self.allocation_arr[next_slot];
-
         FreeMemorySlot {
-            alloc_ptr: alloc_ptr.cast_mut(),
+            allocation_arr: &self.allocation_arr,
             index: next_slot,
-            _phantom: PhantomData,
         }
     }
 
-    pub fn request_slot(&self) -> ClaimedVolAddress<T, R, W> {
+    pub fn request_slot(&self) -> ClaimedVolAddress<T, R, W, C> {
         let series = self.series;
-        unsafe {
-            self.find_available_memory_slot()
-                .into_claimed()
-                .into_claimed_vol_address(series)
-        }
+        self.find_available_memory_slot()
+            .into_claimed()
+            .into_claimed_vol_address(series)
     }
 }

@@ -1,9 +1,8 @@
 #![no_std]
 #![no_main]
 
-use gba::prelude::*;
-use system::gba::{ClaimedVolAddress, ClaimedVolRegion, GBA};
-use voladdress::Safe;
+use gba::video::DisplayControl;
+use system::gba::GBA;
 
 pub mod system;
 
@@ -14,18 +13,26 @@ fn panic_handler(_: &core::panic::PanicInfo) -> ! {
 
 #[no_mangle]
 extern "C" fn main() -> ! {
-    let gba = GBA::take();
+    let mut gba = GBA::take();
 
-    let pal_bank_1 = gba.bg_palette_memory.request_aligned_memory(16, 1);
-    let pal_bank_2 = gba.bg_palette_memory.request_aligned_memory(16, 1);
+    let _pal_bank_1 = gba.bg_palette_memory.request_aligned_memory(16, 1);
+    let _pal_bank_2 = gba.bg_palette_memory.request_aligned_memory(16, 1);
 
-    let oam1 = gba.obj_attr_memory.request_slot();
-    let oam2 = gba.obj_attr_memory.request_slot();
+    let _oam1 = gba.obj_attr_memory.request_slot();
+    let _oam2 = gba.obj_attr_memory.request_slot();
 
     // Sprite:
     // Owns tile data in OBJ_TILES
-    // Owns OAM
+    // Store number of tiles.
+    // Owns OAM slot
     // Owns a palette bank
+    // Owns ObjectAttr struct
+    //
+    // Commit method:
+    //      Flushes ObjectAttr to OAM
+    // Load method:
+    //      Claims relevant memory and takes ownership
+    //      Writes palette to PALRAM
 
     loop {}
 }
