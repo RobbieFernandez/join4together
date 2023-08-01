@@ -111,29 +111,46 @@ impl<T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
         }
     }
 
-    fn find_available_memory_range(&mut self, requested_size: usize) -> FreeMemoryRange {
-        let mut pos = 0;
+    fn find_available_memory_range(
+        &mut self,
+        alignment: usize,
+        requested_aligned_chunks: usize,
+    ) -> FreeMemoryRange {
+        let mut pos = 0; // The index of the last seen aligned chunk
+        let num_chunks = C / alignment;
 
         while pos < self.allocation_arr.len() {
-            let mut iter = (&self.allocation_arr[pos..]).iter();
+            let chunk_pos = pos * alignment;
+            let mut chunk_iter = (&self.allocation_arr[chunk_pos..]).chunks_exact(alignment);
 
-            let start_of_range = iter.position(|e| !e).unwrap() + pos;
-            let end_of_range = iter.position(|e| *e);
+            // Find first chunk that contains unclaimed memory.
+            let starting_chunk_index = chunk_iter
+                .position(|chunk| chunk.iter().all(|e| !e))
+                .expect("Out of memory!");
 
-            let range_size = match end_of_range {
-                Some(n) => n,
-                None => self.allocation_arr.len() - start_of_range,
+            // Find the next chunk that contains at least 1 claimed memory address
+            let next_claimed_chunk_index = chunk_iter.position(|chunk| chunk.iter().any(|e| *e));
+
+            // If there was no next claimed chunk found, then the free chunk lasts until
+            // the end of the underlying VolBlock.
+            let num_free_chunks = match next_claimed_chunk_index {
+                Some(n) => n - starting_chunk_index,
+                None => num_chunks - starting_chunk_index,
             };
 
-            let end_of_range = start_of_range + range_size;
+            if num_free_chunks >= requested_aligned_chunks {
+                let start_of_range = starting_chunk_index * alignment;
+                let end_of_range = start_of_range + requested_aligned_chunks * alignment;
 
-            pos = end_of_range;
-
-            if range_size >= requested_size {
                 return FreeMemoryRange {
                     chunk: &self.allocation_arr[start_of_range..end_of_range],
                     start: start_of_range,
                 };
+            }
+
+            pos = match next_claimed_chunk_index {
+                Some(n) => n,
+                None => panic!("Out of memory!"),
             }
         }
 
@@ -141,11 +158,19 @@ impl<T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
     }
 
     pub fn request_memory(&mut self, size: usize) -> ClaimedVolRegion<T, R, W> {
+        self.request_aligned_memory(1, size)
+    }
+
+    pub fn request_aligned_memory(
+        &mut self,
+        alignment: usize,
+        aligned_chunks: usize,
+    ) -> ClaimedVolRegion<T, R, W> {
         let block = self.block;
         // This is safe so long as this is the only method that ever constructs
         // FreeMemoryRanges. The struct itself is private so this assumption holds true.
         unsafe {
-            self.find_available_memory_range(size)
+            self.find_available_memory_range(1, aligned_chunks)
                 .into_claimed()
                 .into_claimed_vol_region(block)
         }
