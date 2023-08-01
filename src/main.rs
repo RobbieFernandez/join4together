@@ -1,8 +1,9 @@
 #![no_std]
 #![no_main]
 
-use gba::video::Color;
-use system::gba::GBA;
+use gba::prelude::*;
+use system::gba::{ClaimedVolAddress, ClaimedVolRegion, GBA};
+use voladdress::Safe;
 
 pub mod system;
 
@@ -13,16 +14,18 @@ fn panic_handler(_: &core::panic::PanicInfo) -> ! {
 
 #[no_mangle]
 extern "C" fn main() -> ! {
-    let mut gba = GBA::take();
+    let gba = GBA::take();
 
-    let bg_palette_manager = gba.bg_palette_memory();
-    let white = Color(0b0_11111_11111_11111);
+    let pal_bank_1 = gba.bg_palette_memory.request_aligned_memory(16, 1);
+    let pal_bank_2 = gba.bg_palette_memory.request_aligned_memory(16, 1);
 
-    let mut bg_pal_slots = bg_palette_manager.request_memory(2);
+    let oam1 = gba.obj_attr_memory.request_slot();
+    let oam2 = gba.obj_attr_memory.request_slot();
 
-    bg_pal_slots
-        .as_vol_region()
-        .write_from_slice(&[white, white]);
+    // Sprite:
+    // Owns tile data in OBJ_TILES
+    // Owns OAM
+    // Owns a palette bank
 
     loop {}
 }

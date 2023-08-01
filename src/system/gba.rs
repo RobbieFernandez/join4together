@@ -4,6 +4,7 @@ use gba::prelude::*;
 use voladdress::Safe;
 
 pub use super::memory::block::ClaimedVolRegion;
+pub use super::memory::series::ClaimedVolAddress;
 
 type PaletteMemory = MemoryBlockManager<Color, Safe, Safe, 256>;
 type ObjAttrMemory = MemorySeriesManager<ObjAttr, Safe, Safe, 128, 8>;
@@ -12,10 +13,10 @@ type ObjTileMemory = MemoryBlockManager<Tile4, Safe, Safe, 1024>;
 static GBA_TAKEN: GbaCell<bool> = GbaCell::new(false);
 
 pub struct GBA {
-    obj_palette_memory: PaletteMemory,
-    bg_palette_memory: PaletteMemory,
-    obj_attr_memory: ObjAttrMemory,
-    obj_tile_memory: ObjTileMemory,
+    pub obj_palette_memory: PaletteMemory,
+    pub bg_palette_memory: PaletteMemory,
+    pub obj_attr_memory: ObjAttrMemory,
+    pub obj_tile_memory: ObjTileMemory,
 }
 
 impl GBA {
@@ -32,21 +33,5 @@ impl GBA {
             obj_attr_memory: ObjAttrMemory::new(OBJ_ATTR_ALL),
             obj_tile_memory: ObjTileMemory::new(OBJ_TILES),
         }
-    }
-
-    pub fn obj_palette_memory(&mut self) -> &mut PaletteMemory {
-        &mut self.obj_palette_memory
-    }
-
-    pub fn bg_palette_memory(&mut self) -> &mut PaletteMemory {
-        &mut self.bg_palette_memory
-    }
-
-    pub fn obj_attr_memory(&mut self) -> &mut ObjAttrMemory {
-        &mut self.obj_attr_memory
-    }
-
-    pub fn obj_tile_memory(&mut self) -> &mut ObjTileMemory {
-        &mut self.obj_tile_memory
     }
 }

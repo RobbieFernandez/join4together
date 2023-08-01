@@ -103,7 +103,7 @@ impl<'a, T, R, W> ClaimedVolRegion<'a, T, R, W> {
     }
 }
 
-impl<T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
+impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
     pub fn new(block: VolBlock<T, R, W, C>) -> Self {
         Self {
             block,
@@ -112,7 +112,7 @@ impl<T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
     }
 
     fn find_available_memory_range(
-        &mut self,
+        &self,
         alignment: usize,
         requested_aligned_chunks: usize,
     ) -> FreeMemoryRange {
@@ -157,20 +157,20 @@ impl<T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
         panic!("Out of memory!");
     }
 
-    pub fn request_memory(&mut self, size: usize) -> ClaimedVolRegion<T, R, W> {
+    pub fn request_memory(&self, size: usize) -> ClaimedVolRegion<T, R, W> {
         self.request_aligned_memory(1, size)
     }
 
     pub fn request_aligned_memory(
-        &mut self,
+        &'a self,
         alignment: usize,
         aligned_chunks: usize,
-    ) -> ClaimedVolRegion<T, R, W> {
+    ) -> ClaimedVolRegion<'a, T, R, W> {
         let block = self.block;
         // This is safe so long as this is the only method that ever constructs
         // FreeMemoryRanges. The struct itself is private so this assumption holds true.
         unsafe {
-            self.find_available_memory_range(1, aligned_chunks)
+            self.find_available_memory_range(alignment, aligned_chunks)
                 .into_claimed()
                 .into_claimed_vol_region(block)
         }
