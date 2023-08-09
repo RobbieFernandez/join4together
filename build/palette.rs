@@ -6,7 +6,7 @@ use id_tree::InsertBehavior::*;
 use id_tree::*;
 
 static MAX_PAL_SIZE: usize = 256;
-static PAL_BANK_SIZE: usize = 16;
+pub static PAL_BANK_SIZE: usize = 16;
 
 #[derive(Clone)]
 pub struct Palette {
@@ -41,8 +41,9 @@ impl DerefMut for Palette {
     }
 }
 
+#[derive(Debug)]
 pub struct PaletteMapper {
-    final_palette: [u16; 256],
+    pub final_palette: [u16; 256],
 }
 
 pub struct MappedPalette {
@@ -213,7 +214,9 @@ fn align_palette_banks(palette_tree: &mut Tree<Palette>, root_id: &NodeId) {
     for node_id in top_palette_node_ids {
         let palette = palette_tree.get_mut(&node_id).unwrap().data_mut();
 
-        if palette.len() > PAL_BANK_SIZE {
+        // Use ">=" because index 0 always means transparent, so the palette can actually
+        // only hold 15 colours.
+        if palette.len() >= PAL_BANK_SIZE {
             panic!("We have created a palbank that is too big!");
         }
 
