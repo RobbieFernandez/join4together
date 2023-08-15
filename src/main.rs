@@ -1,11 +1,10 @@
 #![no_std]
 #![no_main]
 
-use gba::video::DisplayControl;
 use system::gba::GBA;
 
-pub mod system;
 pub mod graphics;
+pub mod system;
 
 #[panic_handler]
 fn panic_handler(_: &core::panic::PanicInfo) -> ! {

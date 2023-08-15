@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
-use std::thread::available_parallelism;
 
 use id_tree::InsertBehavior::*;
 use id_tree::*;
@@ -20,10 +19,6 @@ impl Palette {
 
     fn contains(&self, other: &Self) -> bool {
         other.iter().all(|c| self._palette.contains(c))
-    }
-
-    fn into_mapped(self, mapper: PaletteMapper) -> Option<MappedPalette> {
-        mapper.map_palette(self)
     }
 }
 
@@ -49,6 +44,7 @@ pub struct PaletteMapper {
 pub struct MappedPalette {
     pal_bank: u8,
     indices: [u8; 16],
+    transparency_index: Option<u8>,
 }
 
 pub fn add_palette(palette_tree: &mut Tree<Palette>, palette: Palette) {
@@ -154,6 +150,10 @@ fn merge_top_level_palettes(palette_tree: &mut Tree<Palette>, root_id: &NodeId) 
     let top_palette_node_ids = root_node.children().clone();
     let mut top_palette_node_ids = VecDeque::from(top_palette_node_ids);
 
+    if top_palette_node_ids.is_empty() {
+        return;
+    }
+
     // Combine adjacent palettes, so long as they can fit into a single palbank
     let mut current_node_id = top_palette_node_ids.pop_front().unwrap();
     let mut done = false;
@@ -220,6 +220,12 @@ fn align_palette_banks(palette_tree: &mut Tree<Palette>, root_id: &NodeId) {
             panic!("We have created a palbank that is too big!");
         }
 
+        // A color index of zero always means transparent.
+        // In 4BPP mode, this means we can never use the 0th element
+        // of any palette bank. So always add a zero to the front
+        // of the bank, making the actual colours start at element 1.
+        palette.insert(0, 0);
+
         palette.resize(PAL_BANK_SIZE, 0);
     }
 }
@@ -239,8 +245,7 @@ impl From<Tree<Palette>> for PaletteMapper {
         let children = palette_tree.children(&root_id).unwrap();
 
         for (i, child) in children.enumerate() {
-            let mut slice =
-                &mut final_palette[i * PAL_BANK_SIZE..(i * PAL_BANK_SIZE + PAL_BANK_SIZE)];
+            let slice = &mut final_palette[i * PAL_BANK_SIZE..(i * PAL_BANK_SIZE + PAL_BANK_SIZE)];
 
             let pal_bank_colors = child.data();
 
@@ -254,7 +259,11 @@ impl From<Tree<Palette>> for PaletteMapper {
 }
 
 impl PaletteMapper {
-    fn map_palette(&self, raw_palette: Palette) -> Option<MappedPalette> {
+    pub fn map_palette(
+        &self,
+        raw_palette: &Palette,
+        transparency_index: Option<u8>,
+    ) -> Option<MappedPalette> {
         // Make sure the palette can fit into a palbank.
         if raw_palette.len() > MAX_PAL_SIZE {
             panic!("Palette cannot contain more than {} colors.", MAX_PAL_SIZE);
@@ -279,6 +288,7 @@ impl PaletteMapper {
                 MappedPalette {
                     pal_bank: i as u8,
                     indices,
+                    transparency_index,
                 }
             })
             .next()
@@ -286,5 +296,21 @@ impl PaletteMapper {
 
     pub fn full_palette(&self) -> [u16; 256] {
         self.final_palette.clone()
+    }
+}
+
+impl MappedPalette {
+    pub fn map_index(&self, index: u8) -> u8 {
+        if let Some(n) = self.transparency_index {
+            if index == n {
+                return 0;
+            }
+        }
+
+        self.indices[index as usize]
+    }
+
+    pub fn palette_bank(&self) -> u8 {
+        self.pal_bank
     }
 }
