@@ -50,7 +50,7 @@ pub fn generate_sprite_struct_src(
             }
 
             // Pack into a u32 and push it to the tile
-            converted_tile[i] = pack_indices(row);
+            converted_tile[i] = pack_tile_row(row);
         }
 
         tile_data.push(Tile4::new(converted_tile));
@@ -98,9 +98,26 @@ fn create_index_tiles(index_array: &Vec<u8>, width: u32, height: u32) -> Vec<[[u
     tiles
 }
 
-fn pack_indices(indices: [u8; 8]) -> u32 {
-    // TODO
-    0
+fn pack_tile_row(indices: [u8; 8]) -> u32 {
+    let mut packed: u32 = 0;
+    let max_index = 0xF;
+
+    for (i, chunk) in (&indices).chunks(2).enumerate() {
+        let left_index = chunk[0];
+        let right_index = chunk[1];
+
+        if left_index > max_index || right_index > max_index {
+            panic!("Tile data contains index that cannot fit into 4 bits.");
+        }
+
+        // Within the byte, the left pixel's index will occupy the LSB
+        let byte = (left_index | right_index << 4) as u32;
+
+        // The left pixels occupy the LSB, so shift left as we go.
+        packed |= byte << i * 8;
+    }
+
+    packed
 }
 
 fn generate_code(sprite: &SpriteWithPalette, tile_data: TileVec, palette_bank: u8) -> String {
