@@ -1,4 +1,4 @@
-use gba::{video::{
+use gba::video::{
     Tile4,
     obj::{
         ObjShape, 
@@ -8,9 +8,8 @@ use gba::{video::{
         ObjAttr2, 
         ObjDisplayStyle
     }
-}, prelude::{MgbaBufferedLogger, MgbaMessageLevel}};
+};
 
-use core::fmt::Write;
 use voladdress::Safe;
 
 use crate::system::gba::{ClaimedVolRegion, GBA};
@@ -32,20 +31,9 @@ impl Sprite {
         let mut memory = gba.obj_tile_memory.request_memory(self.tiles.len());
         let mem_region = memory.as_vol_region();        
 
-        for i in 0..self.tiles.len() {
-            let tile = self.tiles[i][1];            
-
-            if let Ok(mut logger) = MgbaBufferedLogger::try_new(MgbaMessageLevel::Debug) {
-                writeln!(logger, "Tile: {:#0x}", tile).ok();
-            }
-    
+        for i in 0..self.tiles.len() {    
             mem_region.index(i).write(self.tiles[i]);
         }
-
-        if let Ok(mut logger) = MgbaBufferedLogger::try_new(MgbaMessageLevel::Debug) {
-            writeln!(logger, "Done").ok();
-        }
-
 
         LoadedSprite {
             sprite: &self,

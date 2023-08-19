@@ -74,7 +74,6 @@ pub fn convert_sprite_to_tiles(
     let mut tile_data: Vec<Tile4> = Vec::new();
     
     for tile in tiles {
-        // println!("cargo:warning={:?}", tile);
         let converted_tile: [u32; 8] = tile
             .iter()
             .map(pack_tile_row)
@@ -84,8 +83,6 @@ pub fn convert_sprite_to_tiles(
 
         tile_data.push(Tile4::new(converted_tile));
     }
-
-    println!("cargo:warning={:?}", tile_data);
 
     TileVec::new(tile_data, n_cols, n_rows)
 }
@@ -201,8 +198,6 @@ fn pack_tile_row(indices: &[u8; 8]) -> u32 {
         // The left pixels occupy the LSB, so shift left as we go.
         packed |= byte << (i * 8);
     }
-
-    println!("cargo:warning={:#10x}", packed);
 
     packed
 }
