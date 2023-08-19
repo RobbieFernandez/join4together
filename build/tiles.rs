@@ -23,11 +23,21 @@ impl Deref for Tile4 {
 }
 pub struct TileVec {
     _vec: Vec<Tile4>,
+    num_rows: usize,
+    num_cols: usize
 }
 
 impl TileVec {
-    pub fn new(vec: Vec<Tile4>) -> Self {
-        Self { _vec: vec }
+    pub fn new(vec: Vec<Tile4>, num_rows: usize, num_cols: usize) -> Self {
+        Self { _vec: vec, num_cols, num_rows }
+    }
+
+    pub fn num_rows(&self) -> usize {
+        self.num_rows
+    }
+
+    pub fn num_cols(&self) -> usize {
+        self.num_cols
     }
 }
 
@@ -53,10 +63,10 @@ pub fn convert_sprite_to_tiles(
 
     // Pad the vector to make sure the dimensions are divisible by 8
     let converted_image_data =
-    align_image_vec_to_tiles(converted_image_data, sprite.width, sprite.height);
+        align_image_vec_to_tiles(converted_image_data, sprite.width, sprite.height);
 
     // Convert 1d index array into a vector of 2d tiles
-    let tiles = flat_image_matrix_to_flat_tiles(&converted_image_data, sprite.width, sprite.height);
+    let (tiles, n_cols, n_rows)  = flat_image_matrix_to_flat_tiles(&converted_image_data, sprite.width, sprite.height);
     let tiles = unflatten_tiles(tiles);
 
     // Now we can pack each tile into an array of u32s.
@@ -73,7 +83,7 @@ pub fn convert_sprite_to_tiles(
         tile_data.push(Tile4::new(converted_tile));
     }
 
-    TileVec::new(tile_data)
+    TileVec::new(tile_data, n_cols, n_rows)
 }
 
 // Pad the input vector to make sure the dimensions of the image are divisible by 8.
@@ -115,7 +125,7 @@ fn align_image_vec_to_tiles(image_vec: Vec<u8>, width: usize, height: usize) -> 
 
 /// From a 1-dimensional representation of an indexed image, create a 1-dimensional
 /// representation of the tiles that the image is made from.
-fn flat_image_matrix_to_flat_tiles(flat: &[u8], width: usize, height: usize) -> Vec<u8> {
+fn flat_image_matrix_to_flat_tiles(flat: &[u8], width: usize, height: usize) -> (Vec<u8>, usize, usize) {
     let num_tile_cols = width / TILE_SIZE;
     let num_tile_rows = height / TILE_SIZE;
 
@@ -139,7 +149,7 @@ fn flat_image_matrix_to_flat_tiles(flat: &[u8], width: usize, height: usize) -> 
         }
     }
 
-    unwrapped_tiles
+    (unwrapped_tiles, num_tile_cols, num_tile_rows)
 }
 
 /// Convert a 1-dimensional representaion of image tiles into a vector of 2-dimensional tiles.

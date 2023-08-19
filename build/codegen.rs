@@ -19,11 +19,6 @@ pub fn generate_sprite_struct_src(
     sprite: &SpriteWithPalette,
     palette_mapper: &palette::PaletteMapper,
 ) -> String {
-    // struct needs to hold:
-    //  palbank index
-    //  tile data (4BPP pixels, indices into the palbank)
-    //  size (measured in tiles)
-
     let mapped_palette = palette_mapper
         .map_palette(&sprite.palette, sprite.transparency_index)
         .expect("Failed to map palette.");
@@ -43,12 +38,65 @@ fn generate_sprite_code(sprite: &SpriteWithPalette, tile_data: TileVec, palette_
     // We have this as a Vec, but in the generated code it needs to be an array.
 
     let struct_name = format_ident!("{}_SPRITE", sprite.name.to_string());
+    let width = tile_data.num_cols() * 8;
+    let height = tile_data.num_rows() * 8;
 
-    // TODO - Include sprite's dimensions (in tiles)
+    let (shape, size) = if width == height {
+        let shape = "ObjShape::Square";
+
+        let size = match width {
+            8 => 0,
+            16 => 1,
+            32 => 2,
+            64 => 3,
+            _ => panic!("Invalid tile size.")
+        };
+
+        (shape, size)
+    } else if width > height {
+        let shape = "ObjShape::Horizontal";
+        
+        let size = match width {
+            16 => 0,
+            32 => {
+                match height {
+                    8 => 1,
+                    16 => 2,
+                    _ => panic!("Invalid tile size.")
+                }
+            },
+            64 => 3,
+            _ => panic!("Invalid tile size")
+        };
+
+        (shape, size)
+    } else {
+        let shape = "ObjShape::Vertical";
+
+        let size = match width {
+            8 => {
+                match height {
+                    16 => 0,
+                    32 => 1,
+                    _ => panic!("Invalid tile size.")
+                }
+            },
+            16 => 2,
+            32 => 3,
+            _ => panic!("Invalid tile size.")
+        };
+
+        (shape, size)
+    };
+    let shape_type: syn::Type = syn::parse_str(&shape).unwrap();
+    let size = size as u16;
+
     quote! {
         static #struct_name: Sprite = Sprite {
             tiles: #tile_data,
-            palette_bank: #palette_bank
+            palette_bank: #palette_bank,
+            shape: #shape_type,
+            size: #size
         };
     }
     .to_string()
