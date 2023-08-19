@@ -282,11 +282,11 @@ impl PaletteMapper {
                     // Find color in the final palbank
                     let new_index = d.iter().position(|c| *c == color).unwrap();
 
-                    indices[raw_color_index] = new_index as u8;
+                    indices[raw_color_index] = new_index.try_into().unwrap();
                 }
 
                 MappedPalette {
-                    pal_bank: i as u8,
+                    pal_bank: i.try_into().unwrap(),
                     indices,
                     transparency_index,
                 }
@@ -308,8 +308,9 @@ impl MappedPalette {
                 return 0;
             }
         }
+        let index: usize = index.into();
 
-        self.indices[index as usize]
+        self.indices[index]
     }
 
     pub fn palette_bank(&self) -> u8 {

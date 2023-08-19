@@ -4,6 +4,7 @@ use crate::{palette, SpriteWithPalette};
 
 const TILE_SIZE: usize = 8;
 
+#[derive(Debug)]
 pub struct Tile4 {
     _data: [u32; TILE_SIZE],
 }
@@ -28,7 +29,7 @@ pub struct TileVec {
 }
 
 impl TileVec {
-    pub fn new(vec: Vec<Tile4>, num_rows: usize, num_cols: usize) -> Self {
+    pub fn new(vec: Vec<Tile4>, num_cols: usize, num_rows: usize) -> Self {
         Self { _vec: vec, num_cols, num_rows }
     }
 
@@ -68,11 +69,12 @@ pub fn convert_sprite_to_tiles(
     // Convert 1d index array into a vector of 2d tiles
     let (tiles, n_cols, n_rows)  = flat_image_matrix_to_flat_tiles(&converted_image_data, sprite.width, sprite.height);
     let tiles = unflatten_tiles(tiles);
-
+    
     // Now we can pack each tile into an array of u32s.
     let mut tile_data: Vec<Tile4> = Vec::new();
-
+    
     for tile in tiles {
+        // println!("cargo:warning={:?}", tile);
         let converted_tile: [u32; 8] = tile
             .iter()
             .map(pack_tile_row)
@@ -82,6 +84,8 @@ pub fn convert_sprite_to_tiles(
 
         tile_data.push(Tile4::new(converted_tile));
     }
+
+    println!("cargo:warning={:?}", tile_data);
 
     TileVec::new(tile_data, n_cols, n_rows)
 }
@@ -187,15 +191,18 @@ fn pack_tile_row(indices: &[u8; 8]) -> u32 {
         let right_index = chunk[1];
 
         if left_index > max_index || right_index > max_index {
-            panic!("Tile data contains index that cannot fit into 4 bits.");
+            panic!("Tile contains index that cannot fit into 4 bits.");
         }
 
         // Within the byte, the left pixel's index will occupy the LSB
-        let byte = (left_index | right_index << 4) as u32;
+        let byte = left_index | (right_index << 4);
+        let byte: u32 = byte.into();
 
         // The left pixels occupy the LSB, so shift left as we go.
         packed |= byte << (i * 8);
     }
+
+    println!("cargo:warning={:#10x}", packed);
 
     packed
 }

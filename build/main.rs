@@ -101,8 +101,6 @@ fn extract_sprite_palette(ase: AsepriteFile, filename: String) -> SpriteWithPale
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed=sprites/");
-
     let base_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let base_dir = Path::new(&base_dir);
 

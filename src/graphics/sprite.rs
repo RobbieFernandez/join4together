@@ -1,4 +1,16 @@
-use gba::video::{obj::ObjShape, Tile4};
+use gba::{video::{
+    Tile4,
+    obj::{
+        ObjShape, 
+        ObjAttr, 
+        ObjAttr0, 
+        ObjAttr1, 
+        ObjAttr2, 
+        ObjDisplayStyle
+    }
+}, prelude::{MgbaBufferedLogger, MgbaMessageLevel}};
+
+use core::fmt::Write;
 use voladdress::Safe;
 
 use crate::system::gba::{ClaimedVolRegion, GBA};
@@ -16,18 +28,51 @@ pub struct LoadedSprite<'a> {
 }
 
 impl Sprite {
-    fn load<'a>(&'a self, gba: &'a GBA) -> LoadedSprite<'a> {
+    pub fn load<'a>(&'a self, gba: &'a GBA) -> LoadedSprite<'a> {
         let mut memory = gba.obj_tile_memory.request_memory(self.tiles.len());
-        let mem_region = memory.as_vol_region();
+        let mem_region = memory.as_vol_region();        
 
         for i in 0..self.tiles.len() {
+            let tile = self.tiles[i][1];            
+
+            if let Ok(mut logger) = MgbaBufferedLogger::try_new(MgbaMessageLevel::Debug) {
+                writeln!(logger, "Tile: {:#0x}", tile).ok();
+            }
+    
             mem_region.index(i).write(self.tiles[i]);
         }
+
+        if let Ok(mut logger) = MgbaBufferedLogger::try_new(MgbaMessageLevel::Debug) {
+            writeln!(logger, "Done").ok();
+        }
+
 
         LoadedSprite {
             sprite: &self,
             memory,
         }
+    }
+}
+
+impl<'a> LoadedSprite<'a> {
+    pub fn sprite(&'a self) -> &'a Sprite {
+        self.sprite
+    }
+
+    pub fn create_obj_attr_entry(&self) -> ObjAttr {
+        let mut oa = ObjAttr::new();
+        oa.0 = ObjAttr0::new()
+            .with_bpp8(false)
+            .with_shape(self.sprite.shape)
+            .with_style(ObjDisplayStyle::Normal);
+
+        oa.1 = ObjAttr1::new().with_size(self.sprite.size);
+
+        oa.2 = ObjAttr2::new()
+            .with_tile_id(self.memory.get_start().try_into().unwrap())
+            .with_palbank(self.sprite.palette_bank.into());
+
+        oa
     }
 }
 

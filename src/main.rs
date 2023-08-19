@@ -1,7 +1,10 @@
 #![no_std]
 #![no_main]
 
+use gba::video::Color;
+
 use system::gba::GBA;
+use graphics::sprite::{PALETTE, HOODMAN_SPRITE};
 
 pub mod graphics;
 pub mod system;
@@ -13,26 +16,27 @@ fn panic_handler(_: &core::panic::PanicInfo) -> ! {
 
 #[no_mangle]
 extern "C" fn main() -> ! {
-    let mut gba = GBA::take();
+    let gba = GBA::take();
 
-    let _pal_bank_1 = gba.bg_palette_memory.request_aligned_memory(16, 1);
-    let _pal_bank_2 = gba.bg_palette_memory.request_aligned_memory(16, 1);
+    let mut palette_mem = gba.obj_palette_memory.request_memory(
+        PALETTE.len()
+    );
+    let palette_mem_region = palette_mem.as_vol_region();
 
-    let _oam1 = gba.obj_attr_memory.request_slot();
-    let _oam2 = gba.obj_attr_memory.request_slot();
+    for i in 0..PALETTE.len() {
+        let mut col = Color::new();
+        col.0 = PALETTE[i];
+        palette_mem_region.index(i).write(Color::from(col));
+    }
 
-    // Sprite:
-    // Owns tile data in OBJ_TILES
-    // Store number of tiles.
-    // Owns OAM slot
-    // Owns a palette bank
-    // Owns ObjectAttr struct
-    //
-    // Commit method:
-    //      Flushes ObjectAttr to OAM
-    // Load method:
-    //      Claims relevant memory and takes ownership
-    //      Writes palette to PALRAM
+    let loaded_sprite = HOODMAN_SPRITE.load(&gba);
+    let obj_attr = loaded_sprite.create_obj_attr_entry();
+    
+    // Now construct OAM entry for this sprite. 
+    let mut oa_slot = gba.obj_attr_memory.request_slot();
+    let oa_addr = oa_slot.as_vol_address();
+
+    oa_addr.write(obj_attr);
 
     loop {}
 }

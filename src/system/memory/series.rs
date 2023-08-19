@@ -63,7 +63,7 @@ impl<'a, const C: usize> Drop for ClaimedMemorySlot<'a, C> {
 }
 
 impl<'a, T, R, W, const C: usize> ClaimedVolAddress<'a, T, R, W, C> {
-    pub fn as_vol_address(&'a mut self) -> &'a VolAddress<T, R, W> {
+    pub fn as_vol_address(&mut self) -> &VolAddress<T, R, W> {
         &self.vol_address
     }
 

@@ -11,7 +11,7 @@ pub fn generate_palette_array_src(
     palette: &palette::Palette
 ) -> String {
     quote! {
-        static PALETTE: [u16; 256] = #palette;
+        pub static PALETTE: [u16; 256] = #palette;
     }.to_string()
 }
 
@@ -89,10 +89,10 @@ fn generate_sprite_code(sprite: &SpriteWithPalette, tile_data: TileVec, palette_
         (shape, size)
     };
     let shape_type: syn::Type = syn::parse_str(&shape).unwrap();
-    let size = size as u16;
+    let size: u16 = size.try_into().unwrap();
 
     quote! {
-        static #struct_name: Sprite = Sprite {
+        pub static #struct_name: Sprite = Sprite {
             tiles: #tile_data,
             palette_bank: #palette_bank,
             shape: #shape_type,
@@ -104,7 +104,7 @@ fn generate_sprite_code(sprite: &SpriteWithPalette, tile_data: TileVec, palette_
 
 impl ToTokens for Tile4 {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let hex_literals: Vec<String> = self.iter().map(|i| format!("{:x}", i)).collect();
+        let hex_literals: Vec<String> = self.iter().map(|i| format!("{:#0x}", i)).collect();
         let hex_literals = hex_literals.join(", ");
         let hex_literals = format!("[ {} ]", hex_literals);
         let expr: syn::Expr = syn::parse_str(&hex_literals).unwrap();
