@@ -6,6 +6,7 @@ use palette::{add_palette, resolve_palette};
 
 mod codegen;
 mod palette;
+mod tiles;
 
 #[derive(Debug)]
 struct SpriteError;
@@ -13,8 +14,8 @@ struct SpriteError;
 pub struct SpriteWithPalette {
     name: String,
     palette: palette::Palette,
-    width: u32,
-    height: u32,
+    width: usize,
+    height: usize,
     image_data: Vec<u8>,
     transparency_index: Option<u8>,
 }
@@ -56,6 +57,10 @@ fn extract_sprite_palette(ase: AsepriteFile) -> SpriteWithPalette {
             failure: 0,
         },
     );
+
+    // image_data is a 1-dimensional representation of a 2-dimensional matrix. Each
+    // element in the array represents an index, which identifies the colour in the palette
+    // belonging to that pixel.
     let ((width, height), image_data) = util::to_indexed_image(img, &mapper);
 
     let raw_palette = ase.palette().unwrap();
@@ -83,10 +88,10 @@ fn extract_sprite_palette(ase: AsepriteFile) -> SpriteWithPalette {
     SpriteWithPalette {
         name: "update-me".to_string(),
         palette,
-        width,
-        height,
         image_data,
         transparency_index,
+        width: width.try_into().unwrap(),
+        height: height.try_into().unwrap(),
     }
 }
 

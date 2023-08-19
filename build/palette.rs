@@ -67,10 +67,10 @@ pub fn add_palette(palette_tree: &mut Tree<Palette>, palette: Palette) {
     // Move this palette into the appropriate level
     let new_node_id = match palette_subtree {
         Some(subtree_id) => {
-            let mut iter = palette_tree.traverse_post_order_ids(&subtree_id).unwrap();
+            let mut iter = palette_tree.traverse_post_order_ids(subtree_id).unwrap();
 
             let parent_palette_id = iter.find(|id| {
-                let this_palette = palette_tree.get(&id).unwrap();
+                let this_palette = palette_tree.get(id).unwrap();
                 this_palette.data().contains(&palette)
             });
 
@@ -96,14 +96,14 @@ pub fn add_palette(palette_tree: &mut Tree<Palette>, palette: Palette) {
     let new_node = palette_tree.get(&new_node_id).unwrap();
     let parent = new_node.parent().unwrap();
     let siblings_to_move: Vec<NodeId> = palette_tree
-        .children_ids(&parent)
+        .children_ids(parent)
         .unwrap()
         .filter(|id| **id != new_node_id)
         .filter(|id| {
             let sibling = palette_tree.get(id).unwrap();
             new_node.data().contains(sibling.data())
         })
-        .map(|id| id.clone())
+        .cloned()
         .collect();
 
     for sibling_id in siblings_to_move {
@@ -183,7 +183,7 @@ fn merge_top_level_palettes(palette_tree: &mut Tree<Palette>, root_id: &NodeId) 
                     let children_ids: Vec<NodeId> = palette_tree
                         .children_ids(&next_palette_id)
                         .unwrap()
-                        .map(|n| n.clone())
+                        .cloned()
                         .collect();
 
                     for child_id in children_ids {
@@ -250,7 +250,7 @@ impl From<Tree<Palette>> for PaletteMapper {
             let pal_bank_colors = child.data();
 
             for (j, color) in pal_bank_colors.iter().enumerate() {
-                slice[j] = color.clone();
+                slice[j] = *color;
             }
         }
 
@@ -295,7 +295,7 @@ impl PaletteMapper {
     }
 
     pub fn full_palette(&self) -> [u16; 256] {
-        self.final_palette.clone()
+        self.final_palette
     }
 }
 
