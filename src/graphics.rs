@@ -1,4 +1,1 @@
-// struct Sprite<const T: usize> {
-//     depth: SpriteBitDepth,
-//     tile_data: []
-// }
+pub mod sprite;

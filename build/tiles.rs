@@ -26,7 +26,7 @@ pub struct TileVec {
 }
 
 impl TileVec {
-    fn new(vec: Vec<Tile4>) -> Self {
+    pub fn new(vec: Vec<Tile4>) -> Self {
         Self { _vec: vec }
     }
 }
@@ -53,7 +53,7 @@ pub fn convert_sprite_to_tiles(
 
     // Pad the vector to make sure the dimensions are divisible by 8
     let converted_image_data =
-        align_image_vec_to_tiles(converted_image_data, sprite.width, sprite.height);
+    align_image_vec_to_tiles(converted_image_data, sprite.width, sprite.height);
 
     // Convert 1d index array into a vector of 2d tiles
     let tiles = flat_image_matrix_to_flat_tiles(&converted_image_data, sprite.width, sprite.height);
@@ -93,7 +93,7 @@ fn align_image_vec_to_tiles(image_vec: Vec<u8>, width: usize, height: usize) -> 
 
     if right_padding == 0 && bottom_padding == 0 {
         // Already aligned
-        return aligned;
+        return image_vec;
     }
 
     let num_columns = width + right_padding;

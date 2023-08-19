@@ -43,7 +43,7 @@ pub struct PaletteMapper {
 
 pub struct MappedPalette {
     pal_bank: u8,
-    indices: [u8; 16],
+    pub indices: [u8; 16],
     transparency_index: Option<u8>,
 }
 
@@ -276,7 +276,7 @@ impl PaletteMapper {
             .map(|(i, d)| {
                 let mut indices: [u8; 16] = [0; 16];
 
-                for raw_color_index in 0..16 {
+                for raw_color_index in 0..raw_palette.len() {
                     let color = raw_palette[raw_color_index];
 
                     // Find color in the final palbank
@@ -294,8 +294,10 @@ impl PaletteMapper {
             .next()
     }
 
-    pub fn full_palette(&self) -> [u16; 256] {
-        self.final_palette
+    pub fn full_palette(&self) -> Palette {
+        Palette::new(
+            Vec::from(self.final_palette.clone())
+        )
     }
 }
 

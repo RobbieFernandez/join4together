@@ -7,6 +7,14 @@ use crate::{
     SpriteWithPalette,
 };
 
+pub fn generate_palette_array_src(
+    palette: &palette::Palette
+) -> String {
+    quote! {
+        static PALETTE: [u16; 256] = #palette;
+    }.to_string()
+}
+
 pub fn generate_sprite_struct_src(
     sprite: &SpriteWithPalette,
     palette_mapper: &palette::PaletteMapper,
@@ -22,17 +30,26 @@ pub fn generate_sprite_struct_src(
 
     let tile_vec = convert_sprite_to_tiles(sprite, &mapped_palette);
 
-    let tile_length = tile_vec.len();
-    let struct_name = format_ident!("{}Sprite", sprite.name.to_string());
-    let tile_type = "gba::video::Tile4";
-    let palette_bank = mapped_palette.palette_bank();
+    generate_sprite_code(
+        sprite,
+        tile_vec,
+        mapped_palette.palette_bank(),
+    )
+}
+
+
+fn generate_sprite_code(sprite: &SpriteWithPalette, tile_data: TileVec, palette_bank: u8) -> String {
+    // Build token for the tile data literal first.
+    // We have this as a Vec, but in the generated code it needs to be an array.
+
+    let struct_name = format_ident!("{}_SPRITE", sprite.name.to_string());
 
     // TODO - Include sprite's dimensions (in tiles)
     quote! {
-        static #struct_name: SpriteData {
-            tiles: [ #tile_type : #tile_length ] = #tile_vec;
-            palette_bank = #palette_bank;
-        }
+        static #struct_name: Sprite = Sprite {
+            tiles: #tile_data,
+            palette_bank: #palette_bank
+        };
     }
     .to_string()
 }
@@ -41,14 +58,37 @@ impl ToTokens for Tile4 {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let hex_literals: Vec<String> = self.iter().map(|i| format!("{:x}", i)).collect();
         let hex_literals = hex_literals.join(", ");
+        let hex_literals = format!("[ {} ]", hex_literals);
+        let expr: syn::Expr = syn::parse_str(&hex_literals).unwrap();
 
-        quote! { [ #hex_literals ]}.to_tokens(tokens);
+        expr.to_tokens(tokens);
     }
 }
 
 impl ToTokens for TileVec {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        // Convert from this vec into an array literal
-        // (quote! { [ #hex_literals ]}).to_tokens(tokens);
+        let tiles: Vec<String> = self.iter().map(|tile| {
+            quote!{ #tile }.to_string()
+        }).collect();
+        
+        let tiles = tiles.join(",");
+        let tiles = format!("&[ {} ]", tiles);
+
+        let expr: syn::Expr = syn::parse_str(&tiles).unwrap();
+        expr.to_tokens(tokens);
+    }
+}
+
+impl ToTokens for palette::Palette {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let tiles: Vec<String> = self.iter().map(|tile| {
+            quote!{ #tile }.to_string()
+        }).collect();
+        
+        let tiles = tiles.join(",");
+        let tiles = format!("[ {} ]", tiles);
+
+        let expr: syn::Expr = syn::parse_str(&tiles).unwrap();
+        expr.to_tokens(tokens);
     }
 }

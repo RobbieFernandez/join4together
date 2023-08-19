@@ -8,6 +8,7 @@ mod codegen;
 mod palette;
 mod tiles;
 
+
 #[derive(Debug)]
 struct SpriteError;
 
@@ -33,14 +34,18 @@ fn find_sprites(directory: &Path) -> Result<Vec<SpriteWithPalette>, SpriteError>
             path.is_file(),
             "/sprites dir cannot contain nested directories."
         );
+
+        let filename = entry.file_name().to_ascii_uppercase().into_string().unwrap();
+        let filename = filename.replace(".ASEPRITE", "");
+
         let ase = AsepriteFile::read_file(&path).map_err(|_e| SpriteError)?;
-        asefiles.push(extract_sprite_palette(ase));
+        asefiles.push(extract_sprite_palette(ase, filename));
     }
 
     Ok(asefiles)
 }
 
-fn extract_sprite_palette(ase: AsepriteFile) -> SpriteWithPalette {
+fn extract_sprite_palette(ase: AsepriteFile, filename: String) -> SpriteWithPalette {
     assert!(
         ase.is_indexed_color(),
         "Only indexed color mode can be used."
@@ -86,7 +91,7 @@ fn extract_sprite_palette(ase: AsepriteFile) -> SpriteWithPalette {
     let palette = palette::Palette::new(pal_vec);
 
     SpriteWithPalette {
-        name: "update-me".to_string(),
+        name: filename,
         palette,
         image_data,
         transparency_index,
@@ -116,16 +121,24 @@ fn main() {
 
     let palette_mapper = resolve_palette(palette_tree);
 
+    let palette_source: String = codegen::generate_palette_array_src(&palette_mapper.full_palette());
+
     let struct_definitions: Vec<String> = sprites
         .iter()
         .map(|s| codegen::generate_sprite_struct_src(s, &palette_mapper))
         .collect();
 
-    let source = struct_definitions.join("\n");
+    let struct_definitions: String = struct_definitions.join("\n");
+
+    let source = format!(
+        "{}\n{}",
+        palette_source,
+        struct_definitions
+    );
 
     let output_path = env::var("OUT_DIR").unwrap();
     let output_path = Path::new(&output_path);
-    let output_path = output_path.join(Path::new("sprites.rs"));
+    let output_path = output_path.join(Path::new("sprite_data.rs"));
 
     write_source(&source, &output_path)
 }
