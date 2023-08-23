@@ -6,9 +6,9 @@ use voladdress::Safe;
 pub use super::memory::block::ClaimedVolRegion;
 pub use super::memory::series::ClaimedVolAddress;
 
-type PaletteMemory = MemoryBlockManager<Color, Safe, Safe, 256>;
-type ObjAttrMemory = MemorySeriesManager<ObjAttr, Safe, Safe, 128, 8>;
-type ObjTileMemory = MemoryBlockManager<Tile4, Safe, Safe, 1024>;
+pub type PaletteMemory = MemoryBlockManager<Color, Safe, Safe, 256>;
+pub type ObjAttrMemory = MemorySeriesManager<ObjAttr, Safe, Safe, 128, 8>;
+pub type ObjTileMemory = MemoryBlockManager<Tile4, Safe, Safe, 1024>;
 
 static GBA_TAKEN: GbaCell<bool> = GbaCell::new(false);
 
@@ -48,7 +48,11 @@ impl GBA {
                 .with_video_mode(VideoMode::_0)
                 .with_obj_vram_1d(true)
                 .with_show_obj(true),
-        )
+        );
+
+        DISPSTAT.write(DisplayStatus::new().with_irq_vblank(true));
+        IE.write(IrqBits::VBLANK);
+        IME.write(true);
     }
 
     fn hide_all_objects(&mut self) {

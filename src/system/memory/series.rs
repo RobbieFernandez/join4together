@@ -34,6 +34,7 @@ impl<'a, const C: usize> ClaimedMemorySlot<'a, C> {
         let mut allocation_arr = allocation_arr_cell.borrow_mut();
         let alloc = allocation_arr.get_mut(index).unwrap();
         assert!(!*alloc);
+
         *alloc = true;
         ClaimedMemorySlot {
             index,

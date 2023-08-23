@@ -1,18 +1,11 @@
 use gba::video::{
+    obj::{ObjAttr, ObjAttr0, ObjAttr1, ObjAttr2, ObjDisplayStyle, ObjShape},
     Tile4,
-    obj::{
-        ObjShape, 
-        ObjAttr, 
-        ObjAttr0, 
-        ObjAttr1, 
-        ObjAttr2, 
-        ObjDisplayStyle
-    }
 };
 
 use voladdress::Safe;
 
-use crate::system::gba::{ClaimedVolRegion, GBA};
+use crate::system::gba::{ClaimedVolAddress, ClaimedVolRegion, GBA};
 
 pub struct Sprite {
     tiles: &'static [Tile4],
@@ -26,12 +19,17 @@ pub struct LoadedSprite<'a> {
     memory: ClaimedVolRegion<'a, Tile4, Safe, Safe, 1024>,
 }
 
+pub struct LoadedObjectEntry<'a> {
+    slot: ClaimedVolAddress<'a, ObjAttr, Safe, Safe, 128>,
+    obj_attr: ObjAttr,
+}
+
 impl Sprite {
     pub fn load<'a>(&'a self, gba: &'a GBA) -> LoadedSprite<'a> {
         let mut memory = gba.obj_tile_memory.request_memory(self.tiles.len());
-        let mem_region = memory.as_vol_region();        
+        let mem_region = memory.as_vol_region();
 
-        for i in 0..self.tiles.len() {    
+        for i in 0..self.tiles.len() {
             mem_region.index(i).write(self.tiles[i]);
         }
 
@@ -47,7 +45,7 @@ impl<'a> LoadedSprite<'a> {
         self.sprite
     }
 
-    pub fn create_obj_attr_entry(&self) -> ObjAttr {
+    pub fn create_obj_attr_entry(&'a self, gba: &'a GBA) -> LoadedObjectEntry<'a> {
         let mut oa = ObjAttr::new();
         oa.0 = ObjAttr0::new()
             .with_bpp8(false)
@@ -60,7 +58,19 @@ impl<'a> LoadedSprite<'a> {
             .with_tile_id(self.memory.get_start().try_into().unwrap())
             .with_palbank(self.sprite.palette_bank.into());
 
-        oa
+        let slot = gba.obj_attr_memory.request_slot();
+
+        LoadedObjectEntry { slot, obj_attr: oa }
+    }
+}
+
+impl<'a> LoadedObjectEntry<'a> {
+    pub fn commit_to_memory(&mut self) {
+        self.slot.as_vol_address().write(self.obj_attr);
+    }
+
+    pub fn get_obj_attr_data<'b>(&'b mut self) -> &'b mut ObjAttr {
+        &mut self.obj_attr
     }
 }
 

@@ -39,7 +39,7 @@ impl<'a, const C: usize> ClaimedMemoryRange<'a, C> {
     ) -> ClaimedMemoryRange<'a, C> {
         let mut allocation_arr = allocation_arr_cell.borrow_mut();
 
-        for i in 0..length {
+        for i in start..(start + length) {
             let e = allocation_arr.get_mut(i).unwrap();
             assert!(*e == false);
             *e = true;
@@ -73,7 +73,7 @@ impl<'a, const C: usize> Drop for ClaimedMemoryRange<'a, C> {
     fn drop(&mut self) {
         let mut allocation_arr = self.allocation_arr.borrow_mut();
 
-        for i in 0..self.length {
+        for i in self.start..(self.start + self.length) {
             let e = allocation_arr.get_mut(i).unwrap();
             assert!(*e);
             *e = false;
