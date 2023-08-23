@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{cmp::max, ops::Deref};
 
 use crate::{palette, SpriteWithPalette};
 
@@ -25,12 +25,16 @@ impl Deref for Tile4 {
 pub struct TileVec {
     _vec: Vec<Tile4>,
     num_rows: usize,
-    num_cols: usize
+    num_cols: usize,
 }
 
 impl TileVec {
     pub fn new(vec: Vec<Tile4>, num_cols: usize, num_rows: usize) -> Self {
-        Self { _vec: vec, num_cols, num_rows }
+        Self {
+            _vec: vec,
+            num_cols,
+            num_rows,
+        }
     }
 
     pub fn num_rows(&self) -> usize {
@@ -62,17 +66,18 @@ pub fn convert_sprite_to_tiles(
         .map(|i| mapped_palette.map_index(*i))
         .collect();
 
-    // Pad the vector to make sure the dimensions are divisible by 8
-    let converted_image_data =
+    // Pad the vector to make sure the dimensions are a power of 2
+    let (converted_image_data, padded_width, padded_height) =
         align_image_vec_to_tiles(converted_image_data, sprite.width, sprite.height);
 
     // Convert 1d index array into a vector of 2d tiles
-    let (tiles, n_cols, n_rows)  = flat_image_matrix_to_flat_tiles(&converted_image_data, sprite.width, sprite.height);
+    let (tiles, n_cols, n_rows) =
+        flat_image_matrix_to_flat_tiles(&converted_image_data, padded_width, padded_height);
     let tiles = unflatten_tiles(tiles);
-    
+
     // Now we can pack each tile into an array of u32s.
     let mut tile_data: Vec<Tile4> = Vec::new();
-    
+
     for tile in tiles {
         let converted_tile: [u32; 8] = tile
             .iter()
@@ -87,46 +92,47 @@ pub fn convert_sprite_to_tiles(
     TileVec::new(tile_data, n_cols, n_rows)
 }
 
-// Pad the input vector to make sure the dimensions of the image are divisible by 8.
+// Pad the input vector to make sure the dimensions of the image are a power of 2.
 // This is done by adding transparent pixels along the right and bottom edges as needed.
-fn align_image_vec_to_tiles(image_vec: Vec<u8>, width: usize, height: usize) -> Vec<u8> {
+fn align_image_vec_to_tiles(
+    image_vec: Vec<u8>,
+    width: usize,
+    height: usize,
+) -> (Vec<u8>, usize, usize) {
     let mut aligned: Vec<u8> = Vec::new();
 
-    let right_padding = match width % TILE_SIZE {
-        0 => 0,
-        n => TILE_SIZE - n,
-    };
+    let target_width = max(TILE_SIZE, width.next_power_of_two());
+    let target_height = max(TILE_SIZE, height.next_power_of_two());
 
-    let bottom_padding = match height % TILE_SIZE {
-        0 => 0,
-        n => TILE_SIZE - n,
-    };
+    let right_padding = target_width - width;
+    let bottom_padding = target_height - height;
 
     if right_padding == 0 && bottom_padding == 0 {
         // Already aligned
-        return image_vec;
+        return (image_vec, target_width, target_height);
     }
-
-    let num_columns = width + right_padding;
-    let num_rows = height + bottom_padding;
 
     // Add each row, with padding, into the aligned vec.
     for row in 0..height {
         let row_start = row * width;
         let mut row_slice = Vec::from(&image_vec[row_start..(row_start + width)]);
-        row_slice.resize(num_columns, 0);
+        row_slice.resize(target_width, 0);
         aligned.append(&mut row_slice);
     }
 
     // Add any needed extra rows
-    aligned.resize(num_rows * num_columns, 0);
+    aligned.resize(target_width * target_height, 0);
 
-    aligned
+    (aligned, target_width, target_height)
 }
 
 /// From a 1-dimensional representation of an indexed image, create a 1-dimensional
 /// representation of the tiles that the image is made from.
-fn flat_image_matrix_to_flat_tiles(flat: &[u8], width: usize, height: usize) -> (Vec<u8>, usize, usize) {
+fn flat_image_matrix_to_flat_tiles(
+    flat: &[u8],
+    width: usize,
+    height: usize,
+) -> (Vec<u8>, usize, usize) {
     let num_tile_cols = width / TILE_SIZE;
     let num_tile_rows = height / TILE_SIZE;
 

@@ -4,10 +4,10 @@ use asefile::{util, AsepriteFile};
 use id_tree::{Node, TreeBuilder};
 use palette::{add_palette, resolve_palette};
 
+mod binpack;
 mod codegen;
 mod palette;
 mod tiles;
-
 
 #[derive(Debug)]
 struct SpriteError;
@@ -35,7 +35,12 @@ fn find_sprites(directory: &Path) -> Result<Vec<SpriteWithPalette>, SpriteError>
             "/sprites dir cannot contain nested directories."
         );
 
-        let filename = entry.file_name().to_ascii_uppercase().into_string().unwrap();
+        let filename = entry
+            .file_name()
+            .to_ascii_uppercase()
+            .into_string()
+            .map_err(|_e| SpriteError)?;
+
         let filename = filename.replace(".ASEPRITE", "");
 
         let ase = AsepriteFile::read_file(&path).map_err(|_e| SpriteError)?;
@@ -55,8 +60,10 @@ fn extract_sprite_palette(ase: AsepriteFile, filename: String) -> SpriteWithPale
 
     let transparency_index = ase.transparent_color_index();
 
+    let raw_palette = ase.palette().unwrap();
+
     let mapper = util::PaletteMapper::new(
-        ase.palette().unwrap(),
+        &raw_palette,
         util::MappingOptions {
             transparent: transparency_index,
             failure: 0,
@@ -67,8 +74,6 @@ fn extract_sprite_palette(ase: AsepriteFile, filename: String) -> SpriteWithPale
     // element in the array represents an index, which identifies the colour in the palette
     // belonging to that pixel.
     let ((width, height), image_data) = util::to_indexed_image(img, &mapper);
-
-    let raw_palette = ase.palette().unwrap();
 
     let pal_vec: Vec<u16> = (0..raw_palette.num_colors())
         .map(|i| {
@@ -101,7 +106,11 @@ fn extract_sprite_palette(ase: AsepriteFile, filename: String) -> SpriteWithPale
 }
 
 fn main() {
-    let base_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    println!("cargo:rerun-if-changed=sprites/");
+
+    let base_dir = env::var("CARGO_MANIFEST_DIR")
+        .expect("Error reading 'CARGO_MANIFEST_DIR' environment variable. ");
+
     let base_dir = Path::new(&base_dir);
 
     let sprite_dir = Path::new(&"sprites");
@@ -119,7 +128,8 @@ fn main() {
 
     let palette_mapper = resolve_palette(palette_tree);
 
-    let palette_source: String = codegen::generate_palette_array_src(&palette_mapper.full_palette());
+    let palette_source: String =
+        codegen::generate_palette_array_src(&palette_mapper.full_palette());
 
     let struct_definitions: Vec<String> = sprites
         .iter()
@@ -128,13 +138,10 @@ fn main() {
 
     let struct_definitions: String = struct_definitions.join("\n");
 
-    let source = format!(
-        "{}\n{}",
-        palette_source,
-        struct_definitions
-    );
+    let source = format!("{}\n{}", palette_source, struct_definitions);
 
-    let output_path = env::var("OUT_DIR").unwrap();
+    let output_path = env::var("OUT_DIR").expect("Error reading 'OUT_DIR' environment variable. ");
+
     let output_path = Path::new(&output_path);
     let output_path = output_path.join(Path::new("sprite_data.rs"));
 

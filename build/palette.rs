@@ -1,13 +1,14 @@
-use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 
 use id_tree::InsertBehavior::*;
 use id_tree::*;
 
+use super::binpack::{binpack, Bin, BinItem};
+
 static MAX_PAL_SIZE: usize = 256;
 pub static PAL_BANK_SIZE: usize = 16;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Palette {
     _palette: Vec<u16>,
 }
@@ -34,17 +35,6 @@ impl DerefMut for Palette {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self._palette
     }
-}
-
-#[derive(Debug)]
-pub struct PaletteMapper {
-    pub final_palette: [u16; 256],
-}
-
-pub struct MappedPalette {
-    pal_bank: u8,
-    pub indices: [u8; 16],
-    transparency_index: Option<u8>,
 }
 
 pub fn add_palette(palette_tree: &mut Tree<Palette>, palette: Palette) {
@@ -113,7 +103,7 @@ pub fn add_palette(palette_tree: &mut Tree<Palette>, palette: Palette) {
     }
 }
 
-pub fn resolve_palette(mut palette_tree: Tree<Palette>) -> PaletteMapper {
+pub fn resolve_palette(palette_tree: Tree<Palette>) -> PaletteMapper {
     // First sort the top layer of palettes by size.
     let root_id = palette_tree.root_node_id();
 
@@ -123,133 +113,77 @@ pub fn resolve_palette(mut palette_tree: Tree<Palette>) -> PaletteMapper {
     }
     .clone();
 
-    // Sort the top-level palette by length.
-    merge_top_level_palettes(&mut palette_tree, &root_id);
+    // Get all of the root palettes, which encompass every palette in the game.
+    let root_node = palette_tree.get(&root_id).unwrap();
+    let root_palettes: Vec<Palette> = root_node
+        .children()
+        .into_iter()
+        .map(|node_id| palette_tree.get(node_id).unwrap().data())
+        .cloned()
+        .collect();
 
-    // Now pad out the palettes so they are aligned to palbanks.
-    align_palette_banks(&mut palette_tree, &root_id);
+    // Pack them into "bins", representing the palette banks.
+    let root_palettes: Vec<BinItem<Palette>> = root_palettes
+        .iter()
+        .map(|p| BinItem::new(p.clone(), p.len()))
+        .collect();
 
-    // Make sure the combined length of all palettes will fit inside PALRAM.
-    let children: Vec<&NodeId> = palette_tree.children_ids(&root_id).unwrap().collect();
-    let total_pal_size = children.len() * PAL_BANK_SIZE;
+    let palette_banks = binpack(root_palettes, PAL_BANK_SIZE - 1).unwrap();
 
-    if total_pal_size > MAX_PAL_SIZE {
-        panic!("Palette could not be optimized to fit entirely in PALRAM");
-    }
+    let max_banks = MAX_PAL_SIZE / PAL_BANK_SIZE;
+    assert!(palette_banks.len() <= max_banks);
 
-    PaletteMapper::from(palette_tree)
+    // Now unflatten and pad out the palettes so they are aligned to the palette banks.
+    let palette_banks = flatten_palette_banks(palette_banks);
+
+    PaletteMapper::from(palette_banks)
 }
 
-fn merge_top_level_palettes(palette_tree: &mut Tree<Palette>, root_id: &NodeId) {
-    palette_tree
-        .sort_children_by_key(root_id, |n| n.data().len())
-        .unwrap();
+fn flatten_palette_banks(palette_banks: Vec<Bin<Palette>>) -> Vec<Palette> {
+    let mut flattened_palettes: Vec<Palette> = Vec::new();
 
-    let root_node = palette_tree.get(root_id).unwrap();
+    for bank in palette_banks {
+        let bank: Vec<Palette> = bank.into();
+        let bank = bank.into_iter();
 
-    let top_palette_node_ids = root_node.children().clone();
-    let mut top_palette_node_ids = VecDeque::from(top_palette_node_ids);
+        let flatbank: Option<Palette> = bank.reduce(|mut s, mut n| {
+            (s).append(&mut n);
+            s
+        });
 
-    if top_palette_node_ids.is_empty() {
-        return;
-    }
+        if let Some(mut bank) = flatbank {
+            // Every bank needs to start with zero, because we can never
+            // access the zeroth element from a 4BPP tile.
+            bank.insert(0, 0);
 
-    // Combine adjacent palettes, so long as they can fit into a single palbank
-    let mut current_node_id = top_palette_node_ids.pop_front().unwrap();
-    let mut done = false;
-
-    while !done {
-        let next_palette = top_palette_node_ids.pop_front();
-
-        match next_palette {
-            Some(next_palette_id) => {
-                let mut next_palette = palette_tree.get(&next_palette_id).unwrap().data().clone();
-
-                let current_palette_length =
-                    palette_tree.get(&current_node_id).unwrap().data().len();
-
-                let combined_length = current_palette_length + next_palette.len();
-
-                if combined_length < PAL_BANK_SIZE {
-                    // Combine these palettes.
-                    {
-                        let mut current_palette =
-                            palette_tree.get(&current_node_id).unwrap().data().clone();
-
-                        current_palette.append(&mut next_palette);
-                    }
-
-                    // Move the children from the next palette into the current one.
-                    let children_ids: Vec<NodeId> = palette_tree
-                        .children_ids(&next_palette_id)
-                        .unwrap()
-                        .cloned()
-                        .collect();
-
-                    for child_id in children_ids {
-                        palette_tree
-                            .move_node(&child_id, MoveBehavior::ToParent(&current_node_id))
-                            .unwrap();
-                    }
-
-                    palette_tree
-                        .remove_node(next_palette_id, RemoveBehavior::DropChildren)
-                        .unwrap();
-                } else {
-                    // Begin processing the next palette.
-                    current_node_id = next_palette_id;
-                }
-            }
-            None => {
-                done = true;
-            }
+            // // Pad out the bank with zeroes to reach the target size.
+            bank.resize(PAL_BANK_SIZE, 0);
+            flattened_palettes.push(bank);
         }
     }
+
+    flattened_palettes
 }
 
-fn align_palette_banks(palette_tree: &mut Tree<Palette>, root_id: &NodeId) {
-    let root_node = palette_tree.get(root_id).unwrap();
-    let top_palette_node_ids = root_node.children().clone();
-
-    for node_id in top_palette_node_ids {
-        let palette = palette_tree.get_mut(&node_id).unwrap().data_mut();
-
-        // Use ">=" because index 0 always means transparent, so the palette can actually
-        // only hold 15 colours.
-        if palette.len() >= PAL_BANK_SIZE {
-            panic!("We have created a palbank that is too big!");
-        }
-
-        // A color index of zero always means transparent.
-        // In 4BPP mode, this means we can never use the 0th element
-        // of any palette bank. So always add a zero to the front
-        // of the bank, making the actual colours start at element 1.
-        palette.insert(0, 0);
-
-        palette.resize(PAL_BANK_SIZE, 0);
-    }
+#[derive(Debug)]
+pub struct PaletteMapper {
+    pub final_palette: [u16; 256],
 }
 
-impl From<Tree<Palette>> for PaletteMapper {
-    fn from(palette_tree: Tree<Palette>) -> Self {
+pub struct MappedPalette {
+    pal_bank: u8,
+    pub indices: [u8; 16],
+    transparency_index: Option<u8>,
+}
+
+impl From<Vec<Palette>> for PaletteMapper {
+    fn from(palettes: Vec<Palette>) -> Self {
         let mut final_palette: [u16; 256] = [0; 256];
 
-        let root_id = palette_tree.root_node_id();
-
-        let root_id = match root_id {
-            Some(id) => id,
-            None => panic!("Tree not initialized"),
-        }
-        .clone();
-
-        let children = palette_tree.children(&root_id).unwrap();
-
-        for (i, child) in children.enumerate() {
+        for (i, pal) in palettes.iter().enumerate() {
             let slice = &mut final_palette[i * PAL_BANK_SIZE..(i * PAL_BANK_SIZE + PAL_BANK_SIZE)];
 
-            let pal_bank_colors = child.data();
-
-            for (j, color) in pal_bank_colors.iter().enumerate() {
+            for (j, color) in pal.iter().enumerate() {
                 slice[j] = *color;
             }
         }
@@ -266,11 +200,12 @@ impl PaletteMapper {
     ) -> Option<MappedPalette> {
         // Make sure the palette can fit into a palbank.
         if raw_palette.len() > MAX_PAL_SIZE {
-            panic!("Palette cannot contain more than {} colors.", MAX_PAL_SIZE);
+            return None;
         }
 
+        // Find the palette bank that contains this palette
         self.final_palette
-            .chunks(MAX_PAL_SIZE)
+            .chunks(PAL_BANK_SIZE)
             .enumerate()
             .filter(|(_i, d)| raw_palette.iter().all(|c| d.contains(c)))
             .map(|(i, d)| {
@@ -295,9 +230,7 @@ impl PaletteMapper {
     }
 
     pub fn full_palette(&self) -> Palette {
-        Palette::new(
-            Vec::from(self.final_palette.clone())
-        )
+        Palette::new(Vec::from(self.final_palette))
     }
 }
 

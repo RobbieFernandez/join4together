@@ -1,3 +1,5 @@
+use core::cmp::Ordering;
+
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
@@ -7,12 +9,11 @@ use crate::{
     SpriteWithPalette,
 };
 
-pub fn generate_palette_array_src(
-    palette: &palette::Palette
-) -> String {
+pub fn generate_palette_array_src(palette: &palette::Palette) -> String {
     quote! {
         pub static PALETTE: [u16; 256] = #palette;
-    }.to_string()
+    }
+    .to_string()
 }
 
 pub fn generate_sprite_struct_src(
@@ -25,15 +26,14 @@ pub fn generate_sprite_struct_src(
 
     let tile_vec = convert_sprite_to_tiles(sprite, &mapped_palette);
 
-    generate_sprite_code(
-        sprite,
-        tile_vec,
-        mapped_palette.palette_bank(),
-    )
+    generate_sprite_code(sprite, tile_vec, mapped_palette.palette_bank())
 }
 
-
-fn generate_sprite_code(sprite: &SpriteWithPalette, tile_data: TileVec, palette_bank: u8) -> String {
+fn generate_sprite_code(
+    sprite: &SpriteWithPalette,
+    tile_data: TileVec,
+    palette_bank: u8,
+) -> String {
     // Build token for the tile data literal first.
     // We have this as a Vec, but in the generated code it needs to be an array.
 
@@ -41,55 +41,55 @@ fn generate_sprite_code(sprite: &SpriteWithPalette, tile_data: TileVec, palette_
     let width = tile_data.num_cols() * 8;
     let height = tile_data.num_rows() * 8;
 
-    let (shape, size) = if width == height {
-        let shape = "ObjShape::Square";
+    let (shape, size) = match width.cmp(&height) {
+        Ordering::Equal => {
+            let shape = "ObjShape::Square";
 
-        let size = match width {
-            8 => 0,
-            16 => 1,
-            32 => 2,
-            64 => 3,
-            _ => panic!("Invalid tile size.")
-        };
+            let size: u16 = match width {
+                8 => 0,
+                16 => 1,
+                32 => 2,
+                64 => 3,
+                _ => panic!("Invalid tile size."),
+            };
 
-        (shape, size)
-    } else if width > height {
-        let shape = "ObjShape::Horizontal";
-        
-        let size = match width {
-            16 => 0,
-            32 => {
-                match height {
+            (shape, size)
+        }
+        Ordering::Greater => {
+            let shape = "ObjShape::Horizontal";
+
+            let size: u16 = match width {
+                16 => 0,
+                32 => match height {
                     8 => 1,
                     16 => 2,
-                    _ => panic!("Invalid tile size.")
-                }
-            },
-            64 => 3,
-            _ => panic!("Invalid tile size")
-        };
+                    _ => panic!("Invalid tile size."),
+                },
+                64 => 3,
+                _ => panic!("Invalid tile size"),
+            };
 
-        (shape, size)
-    } else {
-        let shape = "ObjShape::Vertical";
+            (shape, size)
+        }
+        Ordering::Less => {
+            let shape = "ObjShape::Vertical";
 
-        let size = match width {
-            8 => {
-                match height {
+            let size: u16 = match width {
+                8 => match height {
                     16 => 0,
                     32 => 1,
-                    _ => panic!("Invalid tile size.")
-                }
-            },
-            16 => 2,
-            32 => 3,
-            _ => panic!("Invalid tile size.")
-        };
+                    _ => panic!("Invalid tile size."),
+                },
+                16 => 2,
+                32 => 3,
+                _ => panic!("Invalid tile size."),
+            };
 
-        (shape, size)
+            (shape, size)
+        }
     };
-    let shape_type: syn::Type = syn::parse_str(&shape).unwrap();
-    let size: u16 = size.try_into().unwrap();
+
+    let shape_type: syn::Type = syn::parse_str(shape).unwrap();
 
     quote! {
         pub static #struct_name: Sprite = Sprite {
@@ -107,7 +107,8 @@ impl ToTokens for Tile4 {
         let hex_literals: Vec<String> = self.iter().map(|i| format!("{:#0x}", i)).collect();
         let hex_literals = hex_literals.join(", ");
         let hex_literals = format!("[ {} ]", hex_literals);
-        let expr: syn::Expr = syn::parse_str(&hex_literals).unwrap();
+        let expr: syn::Expr = syn::parse_str(&hex_literals)
+            .expect("Error producing hex representation of sprite tiles.");
 
         expr.to_tokens(tokens);
     }
@@ -115,10 +116,11 @@ impl ToTokens for Tile4 {
 
 impl ToTokens for TileVec {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let tiles: Vec<String> = self.iter().map(|tile| {
-            quote!{ #tile }.to_string()
-        }).collect();
-        
+        let tiles: Vec<String> = self
+            .iter()
+            .map(|tile| quote! { #tile }.to_string())
+            .collect();
+
         let tiles = tiles.join(",");
         let tiles = format!("&[ {} ]", tiles);
 
@@ -129,14 +131,16 @@ impl ToTokens for TileVec {
 
 impl ToTokens for palette::Palette {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let tiles: Vec<String> = self.iter().map(|tile| {
-            quote!{ #tile }.to_string()
-        }).collect();
-        
+        let tiles: Vec<String> = self
+            .iter()
+            .map(|tile| quote! { #tile }.to_string())
+            .collect();
+
         let tiles = tiles.join(",");
         let tiles = format!("[ {} ]", tiles);
 
-        let expr: syn::Expr = syn::parse_str(&tiles).unwrap();
+        let expr: syn::Expr =
+            syn::parse_str(&tiles).expect("Error producing hex representation of sprite palette.");
         expr.to_tokens(tokens);
     }
 }
