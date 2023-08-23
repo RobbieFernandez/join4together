@@ -26,7 +26,11 @@ pub struct LoadedObjectEntry<'a> {
 
 impl Sprite {
     pub fn load<'a>(&'a self, gba: &'a GBA) -> LoadedSprite<'a> {
-        let mut memory = gba.obj_tile_memory.request_memory(self.tiles.len());
+        let mut memory = gba
+            .obj_tile_memory
+            .request_memory(self.tiles.len())
+            .expect("Out of VRAM.");
+
         let mem_region = memory.as_vol_region();
 
         for i in 0..self.tiles.len() {
@@ -58,7 +62,7 @@ impl<'a> LoadedSprite<'a> {
             .with_tile_id(self.memory.get_start().try_into().unwrap())
             .with_palbank(self.sprite.palette_bank.into());
 
-        let slot = gba.obj_attr_memory.request_slot();
+        let slot = gba.obj_attr_memory.request_slot().expect("Out of OBJRAM");
 
         LoadedObjectEntry { slot, obj_attr: oa }
     }

@@ -1,6 +1,8 @@
 use core::{cell::RefCell, ops::Range};
 use voladdress::{VolBlock, VolRegion};
 
+use super::error::OutOfMemoryError;
+
 struct FreeMemoryRange<'a, const C: usize> {
     allocation_arr: &'a RefCell<[bool; C]>,
     start: usize,
@@ -107,7 +109,7 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
         &self,
         alignment: usize,
         requested_aligned_chunks: usize,
-    ) -> FreeMemoryRange<C> {
+    ) -> Result<FreeMemoryRange<C>, OutOfMemoryError> {
         let mut pos = 0; // The index of the last seen aligned chunk
         let num_chunks = C / alignment;
         let allocation_arr = self.allocation_arr.borrow();
@@ -135,23 +137,26 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
                 let start_of_range = starting_chunk_index * alignment;
                 let length = requested_aligned_chunks * alignment;
 
-                return FreeMemoryRange {
+                return Ok(FreeMemoryRange {
                     allocation_arr: &self.allocation_arr,
                     start: start_of_range,
                     length,
-                };
+                });
             }
 
             pos = match next_claimed_chunk_index {
                 Some(n) => n,
-                None => panic!("Out of memory!"),
+                None => return Err(OutOfMemoryError),
             }
         }
 
-        panic!("Out of memory!");
+        Err(OutOfMemoryError)
     }
 
-    pub fn request_memory(&self, size: usize) -> ClaimedVolRegion<T, R, W, C> {
+    pub fn request_memory(
+        &self,
+        size: usize,
+    ) -> Result<ClaimedVolRegion<T, R, W, C>, OutOfMemoryError> {
         self.request_aligned_memory(1, size)
     }
 
@@ -159,12 +164,12 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
         &'a self,
         alignment: usize,
         aligned_chunks: usize,
-    ) -> ClaimedVolRegion<'a, T, R, W, C> {
+    ) -> Result<ClaimedVolRegion<'a, T, R, W, C>, OutOfMemoryError> {
         let block = self.block;
         // This is safe so long as this is the only method that ever constructs
         // FreeMemoryRanges. The struct itself is private so this assumption holds true.
-        self.find_available_memory_range(alignment, aligned_chunks)
-            .into_claimed()
-            .into_claimed_vol_region(block)
+        let memory_range = self.find_available_memory_range(alignment, aligned_chunks)?;
+
+        Ok(memory_range.into_claimed().into_claimed_vol_region(block))
     }
 }

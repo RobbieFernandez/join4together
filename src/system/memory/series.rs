@@ -3,6 +3,8 @@ use core::cell::RefCell;
 // use core::ops::Range;
 use voladdress::{VolAddress, VolSeries};
 
+use super::error::OutOfMemoryError;
+
 struct FreeMemorySlot<'a, const C: usize> {
     allocation_arr: &'a RefCell<[bool; C]>,
     index: usize,
@@ -81,27 +83,26 @@ impl<T, R, W, const C: usize, const S: usize> MemorySeriesManager<T, R, W, C, S>
         }
     }
 
-    fn find_available_memory_slot(&self) -> FreeMemorySlot<C> {
+    fn find_available_memory_slot(&self) -> Result<FreeMemorySlot<C>, OutOfMemoryError> {
         let next_slot = {
             let allocation_arr = self.allocation_arr.borrow();
             let mut iter = allocation_arr.iter();
 
-            match iter.position(|e| !e) {
-                Some(n) => n,
-                _ => panic!("Out of memory"),
-            }
+            iter.position(|e| !e)
         };
 
-        FreeMemorySlot {
-            allocation_arr: &self.allocation_arr,
-            index: next_slot,
+        match next_slot {
+            Some(n) => Ok(FreeMemorySlot {
+                allocation_arr: &self.allocation_arr,
+                index: n,
+            }),
+            None => Err(OutOfMemoryError),
         }
     }
 
-    pub fn request_slot(&self) -> ClaimedVolAddress<T, R, W, C> {
+    pub fn request_slot(&self) -> Result<ClaimedVolAddress<T, R, W, C>, OutOfMemoryError> {
         let series = self.series;
-        self.find_available_memory_slot()
-            .into_claimed()
-            .into_claimed_vol_address(series)
+        let mem = self.find_available_memory_slot()?;
+        Ok(mem.into_claimed().into_claimed_vol_address(series))
     }
 }

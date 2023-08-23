@@ -22,7 +22,11 @@ fn panic_handler(_: &core::panic::PanicInfo) -> ! {
 extern "C" fn main() -> ! {
     let gba = GBA::take();
 
-    let mut palette_mem = gba.obj_palette_memory.request_memory(PALETTE.len());
+    let mut palette_mem = gba
+        .obj_palette_memory
+        .request_memory(PALETTE.len())
+        .expect("Object palette cannot fit in memory.");
+
     let palette_mem_region = palette_mem.as_vol_region();
 
     for i in 0..PALETTE.len() {
