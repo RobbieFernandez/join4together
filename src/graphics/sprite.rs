@@ -21,6 +21,17 @@ pub struct LoadedSprite<'a> {
     memory: ClaimedVolRegion<'a, Tile4, Safe, Safe, 1024>,
 }
 
+pub struct Animation<const C: usize> {
+    sprites: [&'static Sprite; C],
+    /// How many screen refreshes each frame in the animation lasts for. 1 == 60fps, 2 == 30fps etc
+    tick_rate: u8,
+}
+
+pub struct LoadedAnimation<'a, const C: usize> {
+    animation: &'a Animation<C>,
+    loaded_sprites: [LoadedSprite<'a>; C],
+}
+
 pub struct LoadedObjectEntry<'a> {
     slot: ClaimedVolAddress<'a, ObjAttr, Safe, Safe, 128>,
     obj_attr: ObjAttr,
@@ -85,6 +96,31 @@ impl<'a> LoadedObjectEntry<'a> {
 
     pub fn get_obj_attr_data(&mut self) -> &mut ObjAttr {
         &mut self.obj_attr
+    }
+}
+
+impl<const C: usize> Animation<C> {
+    pub fn load<'a>(&'a self, gba: &'a GBA) -> LoadedAnimation<'a, C> {
+        let loaded_sprites = core::array::from_fn(|i| self.sprites[i].load(gba));
+        LoadedAnimation {
+            animation: self,
+            loaded_sprites,
+        }
+    }
+}
+
+impl<'a, const C: usize> LoadedAnimation<'a, C> {
+    pub fn get_sprite(&'a self, time: u16) -> &'a LoadedSprite {
+        // Convert from time to the sprite index by dividing by tick rate.
+        let num_frames: u16 = C.try_into().unwrap();
+        let tick_rate: u16 = self.animation.tick_rate.into();
+        let index: u16 = (time / tick_rate) % num_frames;
+
+        // This will definitely fit into a usize, because the mod guarantees
+        // it's <= C, which is a usize.
+        let index: usize = index.try_into().unwrap();
+
+        &self.loaded_sprites[index]
     }
 }
 
