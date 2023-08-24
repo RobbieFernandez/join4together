@@ -11,12 +11,20 @@ pub type ObjAttrMemory = MemorySeriesManager<ObjAttr, Safe, Safe, 128, 8>;
 pub type ObjTileMemory = MemoryBlockManager<Tile4, Safe, Safe, 1024>;
 
 static GBA_TAKEN: GbaCell<bool> = GbaCell::new(false);
+static INPUT_STATE: GbaCell<KeyInput> = GbaCell::new(KeyInput::new());
 
 pub struct GBA {
     pub obj_palette_memory: PaletteMemory,
     pub bg_palette_memory: PaletteMemory,
     pub obj_attr_memory: ObjAttrMemory,
     pub obj_tile_memory: ObjTileMemory,
+}
+
+extern "C" fn update_input(irq: IrqBits) {
+    if irq.vblank() {
+        let keystate = KEYINPUT.read();
+        INPUT_STATE.write(keystate);
+    }
 }
 
 impl GBA {
@@ -37,11 +45,15 @@ impl GBA {
         gba
     }
 
-    pub fn set_display_mode(&mut self, display_mode: DisplayControl) {
+    pub fn input_state(&self) -> KeyInput {
+        INPUT_STATE.read()
+    }
+
+    fn set_display_mode(&mut self, display_mode: DisplayControl) {
         DISPCNT.write(display_mode);
     }
 
-    pub fn init(&mut self) {
+    fn init(&mut self) {
         self.hide_all_objects();
         self.set_display_mode(
             DisplayControl::new()
@@ -50,9 +62,12 @@ impl GBA {
                 .with_show_obj(true),
         );
 
+        // Set up the VBLANK IRQ
         DISPSTAT.write(DisplayStatus::new().with_irq_vblank(true));
         IE.write(IrqBits::VBLANK);
         IME.write(true);
+
+        RUST_IRQ_HANDLER.write(Some(update_input));
     }
 
     fn hide_all_objects(&mut self) {
