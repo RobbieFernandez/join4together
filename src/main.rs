@@ -29,10 +29,10 @@ extern "C" fn main() -> ! {
 
     let palette_mem_region = palette_mem.as_vol_region();
 
-    for i in 0..PALETTE.len() {
+    for (i, pal_color) in PALETTE.iter().enumerate() {
         let mut col = Color::new();
-        col.0 = PALETTE[i];
-        palette_mem_region.index(i).write(Color::from(col));
+        col.0 = *pal_color;
+        palette_mem_region.index(i).write(col);
     }
 
     let tile_sprite = BOARD_SLOT_SPRITE.load(&gba);

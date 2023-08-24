@@ -40,7 +40,7 @@ impl Sprite {
         }
 
         LoadedSprite {
-            sprite: &self,
+            sprite: self,
             memory,
         }
     }
@@ -83,7 +83,7 @@ impl<'a> LoadedObjectEntry<'a> {
         self.slot.as_vol_address().write(self.obj_attr);
     }
 
-    pub fn get_obj_attr_data<'b>(&'b mut self) -> &'b mut ObjAttr {
+    pub fn get_obj_attr_data(&mut self) -> &mut ObjAttr {
         &mut self.obj_attr
     }
 }

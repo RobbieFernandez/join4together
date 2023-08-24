@@ -63,7 +63,7 @@ fn extract_sprite_palette(ase: AsepriteFile, filename: String) -> SpriteWithPale
     let raw_palette = ase.palette().unwrap();
 
     let mapper = util::PaletteMapper::new(
-        &raw_palette,
+        raw_palette,
         util::MappingOptions {
             transparent: transparency_index,
             failure: 0,

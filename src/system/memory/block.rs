@@ -43,7 +43,7 @@ impl<'a, const C: usize> ClaimedMemoryRange<'a, C> {
 
         for i in start..(start + length) {
             let e = allocation_arr.get_mut(i).unwrap();
-            assert!(*e == false);
+            assert!(!(*e));
             *e = true;
         }
 
@@ -92,7 +92,7 @@ impl<'a, T, R, W, const C: usize> ClaimedVolRegion<'a, T, R, W, C> {
         self.memory_range.start
     }
 
-    pub fn len(&self) -> usize {
+    pub fn size(&self) -> usize {
         self.memory_range.length
     }
 }
@@ -116,7 +116,7 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
 
         while pos < allocation_arr.len() {
             let chunk_pos = pos * alignment;
-            let mut chunk_iter = (&allocation_arr[chunk_pos..]).chunks_exact(alignment);
+            let mut chunk_iter = allocation_arr[chunk_pos..].chunks_exact(alignment);
 
             // Find first chunk that contains unclaimed memory.
             let starting_chunk_index = chunk_iter

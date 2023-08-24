@@ -117,7 +117,7 @@ pub fn resolve_palette(palette_tree: Tree<Palette>) -> PaletteMapper {
     let root_node = palette_tree.get(&root_id).unwrap();
     let root_palettes: Vec<Palette> = root_node
         .children()
-        .into_iter()
+        .iter()
         .map(|node_id| palette_tree.get(node_id).unwrap().data())
         .cloned()
         .collect();
