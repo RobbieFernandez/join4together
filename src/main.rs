@@ -37,9 +37,11 @@ extern "C" fn main() -> ! {
 
     let tile_sprite = BOARD_SLOT_SPRITE.load(&gba);
 
-    // TODO - The unpadded sprite dimensions should be an output of the build script.
-    let board_width_pixels: u16 = 20 * BOARD_COLUMNS;
-    let board_height_pixels: u16 = 20 * BOARD_ROWS;
+    let board_slot_width: u16 = BOARD_SLOT_SPRITE.width().try_into().unwrap();
+    let board_slot_height: u16 = BOARD_SLOT_SPRITE.height().try_into().unwrap();
+
+    let board_width_pixels: u16 = board_slot_width * BOARD_COLUMNS;
+    let board_height_pixels: u16 = board_slot_height * BOARD_ROWS;
 
     let start_y: u16 = 160 - board_height_pixels;
     let start_x: u16 = (240 - board_width_pixels) / 2;
@@ -52,13 +54,15 @@ extern "C" fn main() -> ! {
         let row: u16 = i / BOARD_COLUMNS;
 
         let obj_attrs = obj_entry.get_obj_attr_data();
-        obj_attrs.0 = obj_attrs.0.with_y(start_y + row * 20);
-        obj_attrs.1 = obj_attrs.1.with_x(start_x + col * 20);
+        obj_attrs.0 = obj_attrs.0.with_y(start_y + row * board_slot_height);
+        obj_attrs.1 = obj_attrs.1.with_x(start_x + col * board_slot_width);
 
         obj_entry.commit_to_memory();
 
         obj_entry
     });
 
-    loop {}
+    loop {
+        gba::bios::VBlankIntrWait();
+    }
 }

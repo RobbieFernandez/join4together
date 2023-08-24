@@ -12,6 +12,8 @@ pub struct Sprite {
     palette_bank: u8,
     shape: ObjShape,
     size: u16,
+    width: usize,
+    height: usize,
 }
 
 pub struct LoadedSprite<'a> {
@@ -41,6 +43,14 @@ impl Sprite {
             sprite: &self,
             memory,
         }
+    }
+
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
+    pub fn width(&self) -> usize {
+        self.width
     }
 }
 

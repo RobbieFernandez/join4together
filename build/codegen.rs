@@ -91,12 +91,17 @@ fn generate_sprite_code(
 
     let shape_type: syn::Type = syn::parse_str(shape).unwrap();
 
+    let width = sprite.width;
+    let height = sprite.height;
+
     quote! {
         pub static #struct_name: Sprite = Sprite {
             tiles: #tile_data,
             palette_bank: #palette_bank,
             shape: #shape_type,
-            size: #size
+            size: #size,
+            width: #width,
+            height: #height
         };
     }
     .to_string()
