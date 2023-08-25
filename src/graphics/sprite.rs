@@ -155,13 +155,16 @@ impl<'a, const C: usize> AnimationController<'a, C> {
         }
     }
 
-    pub fn get_obj_attr_entry(&'a mut self) -> &'a mut LoadedObjectEntry {
+    pub fn get_obj_attr_entry<'b>(&'b mut self) -> &'b mut LoadedObjectEntry<'a>
+    where
+        'a: 'b,
+    {
         let sprite = &self.loaded_animation.loaded_sprites[self.frame_number];
         sprite.store_in_obj_entry(&mut self.loaded_obj_entry);
         &mut self.loaded_obj_entry
     }
 
-    pub fn tick(&'a mut self) {
+    pub fn tick(&mut self) {
         self.tick_counter += 1;
 
         if self.tick_counter == self.loaded_animation.animation.tick_rate {

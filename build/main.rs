@@ -17,8 +17,9 @@ pub struct SpriteWithPalette {
     palette: palette::Palette,
     width: usize,
     height: usize,
-    image_data: Vec<u8>,
+    image_data: Vec<Vec<u8>>,
     transparency_index: Option<u8>,
+    num_frames: usize,
 }
 
 fn find_sprites(directory: &Path) -> Result<Vec<SpriteWithPalette>, SpriteError> {
@@ -56,7 +57,7 @@ fn extract_sprite_palette(ase: AsepriteFile, filename: String) -> SpriteWithPale
         "Only indexed color mode can be used."
     );
 
-    let img = ase.frame(0).image();
+    let mut image_data: Vec<Vec<u8>> = Vec::new();
 
     let transparency_index = ase.transparent_color_index();
 
@@ -69,11 +70,6 @@ fn extract_sprite_palette(ase: AsepriteFile, filename: String) -> SpriteWithPale
             failure: 0,
         },
     );
-
-    // image_data is a 1-dimensional representation of a 2-dimensional matrix. Each
-    // element in the array represents an index, which identifies the colour in the palette
-    // belonging to that pixel.
-    let ((width, height), image_data) = util::to_indexed_image(img, &mapper);
 
     let pal_vec: Vec<u16> = (0..raw_palette.num_colors())
         .map(|i| {
@@ -95,11 +91,31 @@ fn extract_sprite_palette(ase: AsepriteFile, filename: String) -> SpriteWithPale
 
     let palette = palette::Palette::new(pal_vec);
 
+    let width = ase.width();
+    let height = ase.height();
+
+    let num_frames: usize = ase
+        .num_frames()
+        .try_into()
+        .expect("Sprite contains too many frames.");
+
+    for f in 0..num_frames {
+        let f: u32 = f.try_into().unwrap();
+        let img = ase.frame(f).image();
+
+        // image_data is a 1-dimensional representation of a 2-dimensional matrix. Each
+        // element in the array represents an index, which identifies the colour in the palette
+        // belonging to that pixel.
+        let (_, frame_image_data) = util::to_indexed_image(img, &mapper);
+        image_data.push(frame_image_data);
+    }
+
     SpriteWithPalette {
         name: filename,
         palette,
         image_data,
         transparency_index,
+        num_frames,
         width: width.try_into().unwrap(),
         height: height.try_into().unwrap(),
     }

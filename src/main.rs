@@ -3,7 +3,7 @@
 
 use gba::video::Color;
 
-use graphics::sprite::{LoadedObjectEntry, BOARD_SLOT_SPRITE, PALETTE};
+use graphics::sprite::{LoadedObjectEntry, BOARD_SLOT_SPRITE, PALETTE, RED_TOKEN_ANIMATION};
 use system::gba::GBA;
 
 pub mod graphics;
@@ -36,6 +36,8 @@ extern "C" fn main() -> ! {
     }
 
     let tile_sprite = BOARD_SLOT_SPRITE.load(&gba);
+    let red_token_animation = RED_TOKEN_ANIMATION.load(&gba);
+    let mut red_token_animation_controller = red_token_animation.create_controller(&gba);
 
     let board_slot_width: u16 = BOARD_SLOT_SPRITE.width().try_into().unwrap();
     let board_slot_height: u16 = BOARD_SLOT_SPRITE.height().try_into().unwrap();
@@ -46,6 +48,8 @@ extern "C" fn main() -> ! {
     let start_y: u16 = 160 - board_height_pixels;
     let start_x: u16 = (240 - board_width_pixels) / 2;
 
+    // Create an Object entry for each slot that makes up the board.
+    // We need to keep ownership of these in order to keep them in OBJRAM, so store them in an array.
     let _tile_slot_objs: [LoadedObjectEntry; BOARD_SLOTS] = core::array::from_fn(|i| {
         let mut obj_entry = tile_sprite.create_obj_attr_entry(&gba);
 
@@ -56,6 +60,7 @@ extern "C" fn main() -> ! {
         let obj_attrs = obj_entry.get_obj_attr_data();
         obj_attrs.0 = obj_attrs.0.with_y(start_y + row * board_slot_height);
         obj_attrs.1 = obj_attrs.1.with_x(start_x + col * board_slot_width);
+        obj_attrs.2 = obj_attrs.2.with_priority(0);
 
         obj_entry.commit_to_memory();
 
@@ -64,5 +69,11 @@ extern "C" fn main() -> ! {
 
     loop {
         gba::bios::VBlankIntrWait();
+
+        // Advance the animation.
+        red_token_animation_controller.tick();
+        red_token_animation_controller
+            .get_obj_attr_entry()
+            .commit_to_memory();
     }
 }

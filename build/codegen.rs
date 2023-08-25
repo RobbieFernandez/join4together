@@ -2,6 +2,7 @@ use core::cmp::Ordering;
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
+use syn::Ident;
 
 use crate::{
     palette,
@@ -24,20 +25,52 @@ pub fn generate_sprite_struct_src(
         .map_palette(&sprite.palette, sprite.transparency_index)
         .expect("Failed to map palette.");
 
-    let tile_vec = convert_sprite_to_tiles(sprite, &mapped_palette);
+    let tile_vecs = convert_sprite_to_tiles(sprite, &mapped_palette);
 
-    generate_sprite_code(sprite, tile_vec, mapped_palette.palette_bank())
+    let num_frames = tile_vecs.len();
+
+    // Generate sprite for each frame, as well as an animation referencing each frame.
+    if num_frames == 1 {
+        let struct_name = format_ident!("{}_SPRITE", sprite.name.to_string());
+        let tile_vec = tile_vecs.get(0).unwrap();
+        generate_sprite_struct_code(sprite, struct_name, tile_vec, mapped_palette.palette_bank())
+    } else if num_frames > 1 {
+        let frame_structs: Vec<String> = tile_vecs
+            .iter()
+            .enumerate()
+            .map(|(i, tile_vec)| {
+                let struct_name = format_ident!("{}_FRAME_{}_SPRITE", sprite.name.to_string(), i);
+                generate_sprite_struct_code(
+                    sprite,
+                    struct_name,
+                    tile_vec,
+                    mapped_palette.palette_bank(),
+                )
+            })
+            .collect();
+
+        let frame_structs = frame_structs.join("\n");
+
+        let animation_struct_name = format_ident!("{}_ANIMATION", sprite.name.to_string());
+
+        let anim_struct = generate_animation_struct_src(num_frames, animation_struct_name, |i| {
+            format_ident!("{}_FRAME_{}_SPRITE", sprite.name.to_string(), i)
+        });
+
+        format!("{}\n{}", frame_structs, anim_struct)
+    } else {
+        panic!("Failed to generate any tiles for the sprite.");
+    }
 }
 
-fn generate_sprite_code(
+fn generate_sprite_struct_code(
     sprite: &SpriteWithPalette,
-    tile_data: TileVec,
+    struct_name: Ident,
+    tile_data: &TileVec,
     palette_bank: u8,
 ) -> String {
     // Build token for the tile data literal first.
     // We have this as a Vec, but in the generated code it needs to be an array.
-
-    let struct_name = format_ident!("{}_SPRITE", sprite.name.to_string());
     let width = tile_data.num_cols() * 8;
     let height = tile_data.num_rows() * 8;
 
@@ -104,6 +137,41 @@ fn generate_sprite_code(
             height: #height
         };
     }
+    .to_string()
+}
+
+fn generate_animation_struct_src<F>(
+    num_frames: usize,
+    struct_name: Ident,
+    frame_name_generator: F,
+) -> String
+where
+    F: Fn(usize) -> Ident,
+{
+    let size = num_frames;
+
+    let animation_struct_type = format!("Animation<{}>", size);
+    let animation_struct_type: syn::Type = syn::parse_str(&animation_struct_type).unwrap();
+
+    let frame_arr: Vec<String> = (0..num_frames)
+        .map(|i| {
+            let frame_identifer = frame_name_generator(i);
+            quote!( &#frame_identifer ).to_string()
+        })
+        .collect();
+
+    let frame_arr = frame_arr.join(", ");
+    let frame_arr = format!("[ {} ]", frame_arr);
+    let frame_arr: syn::Expr = syn::parse_str(&frame_arr).unwrap();
+
+    // TODO - The tick rate needs to be determined from the file somehow.
+
+    quote!(
+        pub static #struct_name: #animation_struct_type = Animation {
+            tick_rate: 4u8,
+            sprites: #frame_arr
+        };
+    )
     .to_string()
 }
 

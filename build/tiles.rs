@@ -58,38 +58,46 @@ impl Deref for TileVec {
 pub fn convert_sprite_to_tiles(
     sprite: &SpriteWithPalette,
     mapped_palette: &palette::MappedPalette,
-) -> TileVec {
-    // First re-map the palette indices so that we know 0 == transparent during the padding.
-    let converted_image_data: Vec<u8> = sprite
-        .image_data
-        .iter()
-        .map(|i| mapped_palette.map_index(*i))
-        .collect();
+) -> Vec<TileVec> {
+    let mut tile_vecs: Vec<TileVec> = Vec::new();
 
-    // Pad the vector to make sure the dimensions are a power of 2
-    let (converted_image_data, padded_width, padded_height) =
-        align_image_vec_to_tiles(converted_image_data, sprite.width, sprite.height);
+    for i in 0..sprite.num_frames {
+        let image_data: &Vec<u8> = sprite.image_data.get(i).unwrap();
 
-    // Convert 1d index array into a vector of 2d tiles
-    let (tiles, n_cols, n_rows) =
-        flat_image_matrix_to_flat_tiles(&converted_image_data, padded_width, padded_height);
-    let tiles = unflatten_tiles(tiles);
-
-    // Now we can pack each tile into an array of u32s.
-    let mut tile_data: Vec<Tile4> = Vec::new();
-
-    for tile in tiles {
-        let converted_tile: [u32; 8] = tile
+        // First re-map the palette indices so that we know 0 == transparent during the padding.
+        let converted_image_data: Vec<u8> = image_data
             .iter()
-            .map(pack_tile_row)
-            .collect::<Vec<u32>>()
-            .try_into()
-            .expect("Tile row is not the corect size.");
+            .map(|i| mapped_palette.map_index(*i))
+            .collect();
 
-        tile_data.push(Tile4::new(converted_tile));
+        // Pad the vector to make sure the dimensions are a power of 2
+        let (converted_image_data, padded_width, padded_height) =
+            align_image_vec_to_tiles(converted_image_data, sprite.width, sprite.height);
+
+        // Convert 1d index array into a vector of 2d tiles
+        let (tiles, n_cols, n_rows) =
+            flat_image_matrix_to_flat_tiles(&converted_image_data, padded_width, padded_height);
+        let tiles = unflatten_tiles(tiles);
+
+        // Now we can pack each tile into an array of u32s.
+        let mut tile_data: Vec<Tile4> = Vec::new();
+
+        for tile in tiles {
+            let converted_tile: [u32; 8] = tile
+                .iter()
+                .map(pack_tile_row)
+                .collect::<Vec<u32>>()
+                .try_into()
+                .expect("Tile row is not the corect size.");
+
+            tile_data.push(Tile4::new(converted_tile));
+        }
+
+        let tile_vec = TileVec::new(tile_data, n_cols, n_rows);
+        tile_vecs.push(tile_vec);
     }
 
-    TileVec::new(tile_data, n_cols, n_rows)
+    tile_vecs
 }
 
 // Pad the input vector to make sure the dimensions of the image are a power of 2.
