@@ -11,7 +11,8 @@ pub type ObjAttrMemory = MemorySeriesManager<ObjAttr, Safe, Safe, 128, 8>;
 pub type ObjTileMemory = MemoryBlockManager<Tile4, Safe, Safe, 1024>;
 
 static GBA_TAKEN: GbaCell<bool> = GbaCell::new(false);
-static INPUT_STATE: GbaCell<KeyInput> = GbaCell::new(KeyInput::new());
+static PREV_INPUT_STATE: GbaCell<KeyInput> = GbaCell::new(KeyInput::new());
+static CURRENT_INPUT_STATE: GbaCell<KeyInput> = GbaCell::new(KeyInput::new());
 
 pub struct GBA {
     pub obj_palette_memory: PaletteMemory,
@@ -20,10 +21,25 @@ pub struct GBA {
     pub obj_tile_memory: ObjTileMemory,
 }
 
+pub enum GbaKey {
+    A,
+    B,
+    SELECT,
+    START,
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT,
+    L,
+    R,
+}
+
 extern "C" fn update_input(irq: IrqBits) {
     if irq.vblank() {
         let keystate = KEYINPUT.read();
-        INPUT_STATE.write(keystate);
+
+        PREV_INPUT_STATE.write(CURRENT_INPUT_STATE.read());
+        CURRENT_INPUT_STATE.write(keystate);
     }
 }
 
@@ -46,7 +62,15 @@ impl GBA {
     }
 
     pub fn input_state(&self) -> KeyInput {
-        INPUT_STATE.read()
+        CURRENT_INPUT_STATE.read()
+    }
+
+    pub fn key_was_pressed(&self, key: GbaKey) -> bool {
+        read_key(&key, CURRENT_INPUT_STATE.read()) && !read_key(&key, PREV_INPUT_STATE.read())
+    }
+
+    pub fn key_was_released(&self, key: GbaKey) -> bool {
+        read_key(&key, PREV_INPUT_STATE.read()) && !read_key(&key, CURRENT_INPUT_STATE.read())
     }
 
     fn set_display_mode(&mut self, display_mode: DisplayControl) {
@@ -76,5 +100,20 @@ impl GBA {
         for addr in OBJ_ATTR0.iter() {
             addr.write(hidden_obj);
         }
+    }
+}
+
+fn read_key(key: &GbaKey, input_state: KeyInput) -> bool {
+    match key {
+        GbaKey::A => input_state.a(),
+        GbaKey::B => input_state.b(),
+        GbaKey::SELECT => input_state.select(),
+        GbaKey::START => input_state.start(),
+        GbaKey::UP => input_state.up(),
+        GbaKey::DOWN => input_state.down(),
+        GbaKey::LEFT => input_state.left(),
+        GbaKey::RIGHT => input_state.right(),
+        GbaKey::L => input_state.l(),
+        GbaKey::R => input_state.r(),
     }
 }

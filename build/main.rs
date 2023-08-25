@@ -116,8 +116,8 @@ fn extract_sprite_palette(ase: AsepriteFile, filename: String) -> SpriteWithPale
         image_data,
         transparency_index,
         num_frames,
-        width: width.try_into().unwrap(),
-        height: height.try_into().unwrap(),
+        width,
+        height,
     }
 }
 

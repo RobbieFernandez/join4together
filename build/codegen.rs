@@ -30,36 +30,47 @@ pub fn generate_sprite_struct_src(
     let num_frames = tile_vecs.len();
 
     // Generate sprite for each frame, as well as an animation referencing each frame.
-    if num_frames == 1 {
-        let struct_name = format_ident!("{}_SPRITE", sprite.name.to_string());
-        let tile_vec = tile_vecs.get(0).unwrap();
-        generate_sprite_struct_code(sprite, struct_name, tile_vec, mapped_palette.palette_bank())
-    } else if num_frames > 1 {
-        let frame_structs: Vec<String> = tile_vecs
-            .iter()
-            .enumerate()
-            .map(|(i, tile_vec)| {
-                let struct_name = format_ident!("{}_FRAME_{}_SPRITE", sprite.name.to_string(), i);
-                generate_sprite_struct_code(
-                    sprite,
-                    struct_name,
-                    tile_vec,
-                    mapped_palette.palette_bank(),
-                )
-            })
-            .collect();
+    match num_frames.cmp(&1) {
+        Ordering::Equal => {
+            let struct_name = format_ident!("{}_SPRITE", sprite.name.to_string());
+            let tile_vec = tile_vecs.get(0).unwrap();
+            generate_sprite_struct_code(
+                sprite,
+                struct_name,
+                tile_vec,
+                mapped_palette.palette_bank(),
+            )
+        }
+        Ordering::Greater => {
+            let frame_structs: Vec<String> = tile_vecs
+                .iter()
+                .enumerate()
+                .map(|(i, tile_vec)| {
+                    let struct_name =
+                        format_ident!("{}_FRAME_{}_SPRITE", sprite.name.to_string(), i);
+                    generate_sprite_struct_code(
+                        sprite,
+                        struct_name,
+                        tile_vec,
+                        mapped_palette.palette_bank(),
+                    )
+                })
+                .collect();
 
-        let frame_structs = frame_structs.join("\n");
+            let frame_structs = frame_structs.join("\n");
 
-        let animation_struct_name = format_ident!("{}_ANIMATION", sprite.name.to_string());
+            let animation_struct_name = format_ident!("{}_ANIMATION", sprite.name.to_string());
 
-        let anim_struct = generate_animation_struct_src(num_frames, animation_struct_name, |i| {
-            format_ident!("{}_FRAME_{}_SPRITE", sprite.name.to_string(), i)
-        });
+            let anim_struct =
+                generate_animation_struct_src(num_frames, animation_struct_name, |i| {
+                    format_ident!("{}_FRAME_{}_SPRITE", sprite.name.to_string(), i)
+                });
 
-        format!("{}\n{}", frame_structs, anim_struct)
-    } else {
-        panic!("Failed to generate any tiles for the sprite.");
+            format!("{}\n{}", frame_structs, anim_struct)
+        }
+        _ => {
+            panic!("Failed to generate any tiles for the sprite.");
+        }
     }
 }
 
@@ -168,7 +179,7 @@ where
 
     quote!(
         pub static #struct_name: #animation_struct_type = Animation {
-            tick_rate: 4u8,
+            tick_rate: 5u8,
             sprites: #frame_arr
         };
     )

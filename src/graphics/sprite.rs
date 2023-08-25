@@ -90,10 +90,7 @@ impl<'a> LoadedSprite<'a> {
     pub fn store_in_obj_entry(&'a self, obj_entry: &mut LoadedObjectEntry<'a>) {
         let oa = obj_entry.get_obj_attr_data();
 
-        oa.0 =
-            oa.0.with_bpp8(false)
-                .with_shape(self.sprite.shape)
-                .with_style(ObjDisplayStyle::Normal);
+        oa.0 = oa.0.with_bpp8(false).with_shape(self.sprite.shape);
 
         oa.1 = oa.1.with_size(self.sprite.size);
 
@@ -145,7 +142,10 @@ impl<'a, const C: usize> LoadedAnimation<'a, C> {
 impl<'a, const C: usize> AnimationController<'a, C> {
     fn new(loaded_animation: &'a LoadedAnimation<'a, C>, gba: &'a GBA) -> Self {
         let first_frame = &loaded_animation.loaded_sprites[0];
-        let loaded_obj_entry = first_frame.create_obj_attr_entry(gba);
+        let mut loaded_obj_entry = first_frame.create_obj_attr_entry(gba);
+
+        let oa = loaded_obj_entry.get_obj_attr_data();
+        oa.0 = oa.0.with_style(ObjDisplayStyle::Normal);
 
         Self {
             loaded_animation,
@@ -171,6 +171,8 @@ impl<'a, const C: usize> AnimationController<'a, C> {
             self.tick_counter = 0;
             self.frame_number = (self.frame_number + 1) % C;
         }
+
+        self.get_obj_attr_entry().commit_to_memory();
     }
 }
 

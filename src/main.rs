@@ -2,16 +2,13 @@
 #![no_main]
 
 use gba::video::Color;
-
-use graphics::sprite::{LoadedObjectEntry, BOARD_SLOT_SPRITE, PALETTE, RED_TOKEN_ANIMATION};
+use graphics::sprite::{BOARD_SLOT_SPRITE, PALETTE, RED_TOKEN_ANIMATION, YELLOW_TOKEN_ANIMATION};
+use screens::game_screen::GameScreen;
 use system::gba::GBA;
 
 pub mod graphics;
+pub mod screens;
 pub mod system;
-
-const BOARD_COLUMNS: u16 = 7;
-const BOARD_ROWS: u16 = 6;
-const BOARD_SLOTS: usize = (BOARD_COLUMNS * BOARD_ROWS) as usize;
 
 #[panic_handler]
 fn panic_handler(_: &core::panic::PanicInfo) -> ! {
@@ -35,45 +32,55 @@ extern "C" fn main() -> ! {
         palette_mem_region.index(i).write(col);
     }
 
-    let tile_sprite = BOARD_SLOT_SPRITE.load(&gba);
+    let yellow_token_animation = YELLOW_TOKEN_ANIMATION.load(&gba);
     let red_token_animation = RED_TOKEN_ANIMATION.load(&gba);
-    let mut red_token_animation_controller = red_token_animation.create_controller(&gba);
+    let board_slot_sprite = BOARD_SLOT_SPRITE.load(&gba);
 
-    let board_slot_width: u16 = BOARD_SLOT_SPRITE.width().try_into().unwrap();
-    let board_slot_height: u16 = BOARD_SLOT_SPRITE.height().try_into().unwrap();
-
-    let board_width_pixels: u16 = board_slot_width * BOARD_COLUMNS;
-    let board_height_pixels: u16 = board_slot_height * BOARD_ROWS;
-
-    let start_y: u16 = 160 - board_height_pixels;
-    let start_x: u16 = (240 - board_width_pixels) / 2;
-
-    // Create an Object entry for each slot that makes up the board.
-    // We need to keep ownership of these in order to keep them in OBJRAM, so store them in an array.
-    let _tile_slot_objs: [LoadedObjectEntry; BOARD_SLOTS] = core::array::from_fn(|i| {
-        let mut obj_entry = tile_sprite.create_obj_attr_entry(&gba);
-
-        let i: u16 = i.try_into().unwrap();
-        let col: u16 = i % BOARD_COLUMNS;
-        let row: u16 = i / BOARD_COLUMNS;
-
-        let obj_attrs = obj_entry.get_obj_attr_data();
-        obj_attrs.0 = obj_attrs.0.with_y(start_y + row * board_slot_height);
-        obj_attrs.1 = obj_attrs.1.with_x(start_x + col * board_slot_width);
-        obj_attrs.2 = obj_attrs.2.with_priority(0);
-
-        obj_entry.commit_to_memory();
-
-        obj_entry
-    });
+    let mut game_screen = GameScreen::new(
+        &gba,
+        &red_token_animation,
+        &yellow_token_animation,
+        &board_slot_sprite,
+    );
 
     loop {
         gba::bios::VBlankIntrWait();
 
-        // Advance the animation.
-        red_token_animation_controller.tick();
-        red_token_animation_controller
-            .get_obj_attr_entry()
-            .commit_to_memory();
+        game_screen.update();
+
+        // match game_state {
+        //     GameState::Turn(ref state) => {
+        //         let player_anim_controller = match state.player {
+        //             Player::Red => &mut red_token_animation_controller,
+        //             Player::Yellow => &mut yellow_token_animation_controller,
+        //         };
+
+        //         // Handle key presses
+        //         if gba.key_was_pressed(system::gba::GbaKey::LEFT) {
+        //             // let red_obj = red_token_animation_controller
+        //             //     .get_obj_attr_entry()
+        //             //     .get_obj_attr_data();
+
+        //             // red_obj.1 = red_obj.1.with_x(red_obj.1.x() - board_slot_width)
+        //         }
+
+        //         if gba.key_was_pressed(system::gba::GbaKey::RIGHT) {
+        //             // let red_obj = red_token_animation_controller
+        //             //     .get_obj_attr_entry()
+        //             //     .get_obj_attr_data();
+
+        //             // red_obj.1 = red_obj.1.with_x(red_obj.1.x() + board_slot_width)
+        //         }
+
+        //         let mut oa = player_anim_controller
+        //             .get_obj_attr_entry()
+        //             .get_obj_attr_data();
+
+        //         oa.0 = oa.0.with_style(ObjDisplayStyle::Normal);
+
+        //         player_anim_controller.tick();
+        //     }
+        //     _ => {}
+        // }
     }
 }
