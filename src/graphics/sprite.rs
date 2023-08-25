@@ -1,5 +1,5 @@
 use gba::video::{
-    obj::{ObjAttr, ObjAttr0, ObjAttr1, ObjAttr2, ObjDisplayStyle, ObjShape},
+    obj::{ObjAttr, ObjDisplayStyle, ObjShape},
     Tile4,
 };
 
@@ -30,6 +30,13 @@ pub struct Animation<const C: usize> {
 pub struct LoadedAnimation<'a, const C: usize> {
     animation: &'a Animation<C>,
     loaded_sprites: [LoadedSprite<'a>; C],
+}
+
+pub struct AnimationController<'a, const C: usize> {
+    loaded_animation: &'a LoadedAnimation<'a, C>,
+    loaded_obj_entry: LoadedObjectEntry<'a>,
+    tick_counter: u8,
+    frame_number: usize,
 }
 
 pub struct LoadedObjectEntry<'a> {
@@ -71,21 +78,28 @@ impl<'a> LoadedSprite<'a> {
     }
 
     pub fn create_obj_attr_entry(&'a self, gba: &'a GBA) -> LoadedObjectEntry<'a> {
-        let mut oa = ObjAttr::new();
-        oa.0 = ObjAttr0::new()
-            .with_bpp8(false)
-            .with_shape(self.sprite.shape)
-            .with_style(ObjDisplayStyle::Normal);
-
-        oa.1 = ObjAttr1::new().with_size(self.sprite.size);
-
-        oa.2 = ObjAttr2::new()
-            .with_tile_id(self.memory.get_start().try_into().unwrap())
-            .with_palbank(self.sprite.palette_bank.into());
-
         let slot = gba.obj_attr_memory.request_slot().expect("Out of OBJRAM");
+        let oa = ObjAttr::new();
+        let mut entry = LoadedObjectEntry { slot, obj_attr: oa };
 
-        LoadedObjectEntry { slot, obj_attr: oa }
+        self.store_in_obj_entry(&mut entry);
+
+        entry
+    }
+
+    pub fn store_in_obj_entry(&'a self, obj_entry: &mut LoadedObjectEntry<'a>) {
+        let oa = obj_entry.get_obj_attr_data();
+
+        oa.0 =
+            oa.0.with_bpp8(false)
+                .with_shape(self.sprite.shape)
+                .with_style(ObjDisplayStyle::Normal);
+
+        oa.1 = oa.1.with_size(self.sprite.size);
+
+        oa.2 =
+            oa.2.with_tile_id(self.memory.get_start().try_into().unwrap())
+                .with_palbank(self.sprite.palette_bank.into());
     }
 }
 
@@ -121,6 +135,39 @@ impl<'a, const C: usize> LoadedAnimation<'a, C> {
         let index: usize = index.try_into().unwrap();
 
         &self.loaded_sprites[index]
+    }
+
+    pub fn create_controller(&'a self, gba: &'a GBA) -> AnimationController<'a, C> {
+        AnimationController::new(self, gba)
+    }
+}
+
+impl<'a, const C: usize> AnimationController<'a, C> {
+    fn new(loaded_animation: &'a LoadedAnimation<'a, C>, gba: &'a GBA) -> Self {
+        let first_frame = &loaded_animation.loaded_sprites[0];
+        let loaded_obj_entry = first_frame.create_obj_attr_entry(gba);
+
+        Self {
+            loaded_animation,
+            loaded_obj_entry,
+            tick_counter: 0,
+            frame_number: 0,
+        }
+    }
+
+    pub fn get_obj_attr_entry(&'a mut self) -> &'a mut LoadedObjectEntry {
+        let sprite = &self.loaded_animation.loaded_sprites[self.frame_number];
+        sprite.store_in_obj_entry(&mut self.loaded_obj_entry);
+        &mut self.loaded_obj_entry
+    }
+
+    pub fn tick(&'a mut self) {
+        self.tick_counter += 1;
+
+        if self.tick_counter == self.loaded_animation.animation.tick_rate {
+            self.tick_counter = 0;
+            self.frame_number = (self.frame_number + 1) % C;
+        }
     }
 }
 
