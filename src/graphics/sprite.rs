@@ -131,6 +131,10 @@ impl<'a, const C: usize> LoadedAnimation<'a, C> {
         // it's <= C, which is a usize.
         let index: usize = index.try_into().unwrap();
 
+        self.get_frame(index)
+    }
+
+    pub fn get_frame(&'a self, index: usize) -> &'a LoadedSprite {
         &self.loaded_sprites[index]
     }
 
