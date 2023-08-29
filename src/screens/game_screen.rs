@@ -126,13 +126,14 @@ fn take_turn<'a, T: Turn>(
     red_token_animation_controller: &mut AnimationController<'a, 4>,
     game_board: &mut game_board::GameBoard,
 ) -> (Player, TurnOutcome) {
-    let outcome = turn.update(
-        gba,
-        yellow_token_animation_controller,
-        red_token_animation_controller,
-        game_board,
-    );
     let player = turn.get_player();
+
+    let animation_controller = match player {
+        Player::Red => red_token_animation_controller,
+        Player::Yellow => yellow_token_animation_controller,
+    };
+
+    let outcome = turn.update(gba, animation_controller, game_board);
     (player, outcome)
 }
 
