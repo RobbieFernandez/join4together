@@ -1,5 +1,3 @@
-use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel};
-
 use crate::system::constants::BOARD_COLUMNS;
 use crate::system::gba::GBA;
 
@@ -49,10 +47,10 @@ impl CpuTurn {
 }
 
 impl Turn for CpuTurn {
-    fn update<'a>(
+    fn update(
         &mut self,
         _gba: &GBA,
-        animation_controller: &mut AnimationController<'a, 4>,
+        animation_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
     ) -> TurnOutcome {
         let player = self.get_player();

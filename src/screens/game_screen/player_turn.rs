@@ -1,12 +1,11 @@
 use super::game_board;
 use super::turn::{Turn, TurnOutcome};
 use super::Player;
-use crate::graphics::sprite::{AnimationController, BOARD_SLOT_SPRITE, RED_TOKEN_FRAME_0_SPRITE};
+use crate::graphics::sprite::AnimationController;
 use crate::system::{
     constants::BOARD_COLUMNS,
     gba::{GbaKey, GBA},
 };
-use gba::video::obj::ObjDisplayStyle;
 
 pub struct PlayerTurn {
     player: Player,
@@ -39,10 +38,10 @@ impl PlayerTurn {
 }
 
 impl Turn for PlayerTurn {
-    fn update<'a>(
+    fn update(
         &mut self,
         gba: &GBA,
-        anim_controller: &mut AnimationController<'a, 4>,
+        anim_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
     ) -> TurnOutcome {
         if gba.key_was_pressed(GbaKey::LEFT) {

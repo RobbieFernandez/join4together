@@ -14,20 +14,16 @@ pub enum TurnOutcome {
 }
 
 pub trait Turn {
-    fn update<'a>(
+    fn update(
         &mut self,
         gba: &GBA,
-        animation_controller: &mut AnimationController<'a, 4>,
+        animation_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
     ) -> TurnOutcome;
 
     fn get_player(&self) -> Player;
 
-    fn draw_cursor<'a>(
-        &self,
-        column_number: u16,
-        animation_controller: &mut AnimationController<'a, 4>,
-    ) {
+    fn draw_cursor(&self, column_number: u16, animation_controller: &mut AnimationController<4>) {
         let oa = animation_controller
             .get_obj_attr_entry()
             .get_obj_attr_data();

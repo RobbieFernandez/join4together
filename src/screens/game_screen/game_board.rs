@@ -109,17 +109,9 @@ impl<'a> GameBoard<'a> {
     }
 
     pub fn is_winning_token(&self, column: usize, row: usize, player: Player) -> bool {
-        for direction in &DIRECTIONS {
-            let coords = self.move_index_in_direction(column, row, direction);
-
-            if let Some((next_col, next_row)) = coords {
-                if self.is_connected(direction, player, next_col, next_row, 1) {
-                    return true;
-                }
-            }
-        }
-
-        false
+        DIRECTIONS
+            .iter()
+            .any(|direction| self.is_connected(direction, player, column, row))
     }
 
     pub fn player_can_win(&self, column: usize, player: Player) -> bool {
@@ -132,13 +124,7 @@ impl<'a> GameBoard<'a> {
     }
 
     pub fn get_board_after_move(&self, column: usize, player: Player) -> Self {
-        // matrix: [Option<Player>; BOARD_SLOTS],
-        // gba: &'a GBA,
-        // red_token_sprite: &'a LoadedSprite<'a>,
-        // yellow_token_sprite: &'a LoadedSprite<'a>,
-        // token_objects: [Option<LoadedObjectEntry<'a>>; BOARD_SLOTS],
-
-        let mut new_matrix = self.matrix.clone();
+        let mut new_matrix = self.matrix;
 
         let row = self.get_next_free_row(column);
 
@@ -149,15 +135,13 @@ impl<'a> GameBoard<'a> {
             new_matrix[cell_index] = Some(player);
         }
 
-        let cloned_board = Self {
+        Self {
             matrix: new_matrix,
             gba: self.gba,
             red_token_sprite: self.red_token_sprite,
             yellow_token_sprite: self.yellow_token_sprite,
             token_objects: core::array::from_fn(|_| None),
-        };
-
-        cloned_board
+        }
     }
 
     pub fn get_neighbour(
@@ -166,7 +150,7 @@ impl<'a> GameBoard<'a> {
         row: usize,
         direction: &Direction,
     ) -> Option<Player> {
-        let coords = self.move_index_in_direction(column, row, &direction);
+        let coords = self.move_index_in_direction(column, row, direction);
 
         if let Some((col, row)) = coords {
             self.check_token(col, row)
@@ -178,7 +162,7 @@ impl<'a> GameBoard<'a> {
     pub fn get_next_free_row(&self, column_number: usize) -> Option<usize> {
         let num_rows: usize = BOARD_ROWS.try_into().unwrap();
         let column_start = column_number * num_rows;
-        (0..num_rows).find(|i| (&self.matrix[column_start + i]).is_none())
+        (0..num_rows).find(|i| self.matrix[column_start + i].is_none())
     }
 
     fn move_index_in_direction(
@@ -266,30 +250,54 @@ impl<'a> GameBoard<'a> {
         }
     }
 
+    fn get_connected_distance(
+        &self,
+        starting_column: usize,
+        starting_row: usize,
+        direction: &Direction,
+        player: Player,
+    ) -> usize {
+        let mut current_col = starting_column;
+        let mut current_row = starting_row;
+
+        let mut length: usize = 0;
+
+        loop {
+            let new_coords = self.move_index_in_direction(current_col, current_row, direction);
+
+            if let Some((new_col, new_row)) = new_coords {
+                if self.check_token(new_col, new_row) == Some(player) {
+                    length += 1;
+                    current_col = new_col;
+                    current_row = new_row;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        length
+    }
+
     fn is_connected(
         &self,
         direction: &Direction,
         player: Player,
         column: usize,
         row: usize,
-        count: u32,
     ) -> bool {
-        if self.check_token(column, row) == Some(player) {
-            let count = count + 1;
+        let positive_distance = self.get_connected_distance(column, row, &direction, player);
 
-            if count == 4 {
-                true
-            } else {
-                let coords = self.move_index_in_direction(column, row, &direction);
-
-                if let Some((next_column, next_row)) = coords {
-                    self.is_connected(direction, player, next_column, next_row, count)
-                } else {
-                    false
-                }
-            }
+        if positive_distance >= 3 {
+            true
         } else {
-            false
+            let opposite_direction = direction.opposite();
+            let negative_distance =
+                self.get_connected_distance(column, row, &opposite_direction, player);
+
+            (positive_distance + negative_distance) >= 3
         }
     }
 }
@@ -343,29 +351,16 @@ pub fn board_top_left_corner() -> (u16, u16) {
 }
 
 impl Direction {
-    pub fn row_movement(&self) -> i32 {
+    pub fn opposite(&self) -> Self {
         match self {
-            Direction::North => 1,
-            Direction::East => 0,
-            Direction::South => -1,
-            Direction::West => 0,
-            Direction::NorthEast => 1,
-            Direction::SouthEast => -1,
-            Direction::SouthWest => -1,
-            Direction::NorthWest => 1,
-        }
-    }
-
-    pub fn col_movement(&self) -> i32 {
-        match self {
-            Direction::North => 0,
-            Direction::East => 1,
-            Direction::South => 0,
-            Direction::West => -1,
-            Direction::NorthEast => 1,
-            Direction::SouthEast => 1,
-            Direction::SouthWest => -1,
-            Direction::NorthWest => -1,
+            Direction::North => Direction::South,
+            Direction::NorthEast => Direction::SouthWest,
+            Direction::East => Direction::West,
+            Direction::SouthEast => Direction::NorthWest,
+            Direction::South => Direction::North,
+            Direction::SouthWest => Direction::NorthEast,
+            Direction::West => Direction::East,
+            Direction::NorthWest => Direction::SouthEast,
         }
     }
 }
