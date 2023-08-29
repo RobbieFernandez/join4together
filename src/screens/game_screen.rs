@@ -1,12 +1,16 @@
 use crate::graphics::sprite::{
     AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite,
 };
-use crate::system::{constants::BOARD_SLOTS, gba::GBA};
+use crate::system::constants::SCREEN_WIDTH;
+use crate::system::{constants::BOARD_SLOTS, constants::SCREEN_HEIGHT, gba::GBA};
 use cpu_turn::CpuTurn;
 use gba::prelude::ObjDisplayStyle;
 use player_turn::PlayerTurn;
 use turn::{Turn, TurnOutcome};
 
+use self::cpu_face::CpuSprites;
+
+pub mod cpu_face;
 mod cpu_turn;
 mod game_board;
 mod player_turn;
@@ -31,6 +35,7 @@ pub struct GameScreen<'a> {
     _board_slot_objects: [LoadedObjectEntry<'a>; BOARD_SLOTS],
     game_state: GameState,
     game_board: game_board::GameBoard<'a>,
+    cpu_face: cpu_face::CpuFace<'a>,
 }
 
 impl<'a> GameScreen<'a> {
@@ -39,6 +44,7 @@ impl<'a> GameScreen<'a> {
         red_token_animation: &'a LoadedAnimation<4>,
         yellow_token_animation: &'a LoadedAnimation<4>,
         board_slot_sprite: &'a LoadedSprite<'a>,
+        cpu_sprites: &'a CpuSprites<'a>,
     ) -> Self {
         let red_token_animation_controller = red_token_animation.create_controller(gba);
         let yellow_token_animation_controller = yellow_token_animation.create_controller(gba);
@@ -56,6 +62,16 @@ impl<'a> GameScreen<'a> {
             yellow_token_animation.get_frame(0),
         );
 
+        let cpu_head_sprite = cpu_sprites.get_head_sprite().sprite();
+
+        let cpu_head_height: u16 = cpu_head_sprite.height().try_into().unwrap();
+        let cpu_head_width: u16 = cpu_head_sprite.width().try_into().unwrap();
+
+        let cpu_head_ypos = SCREEN_HEIGHT - cpu_head_height;
+        let cpu_head_xpos = SCREEN_WIDTH - cpu_head_width - 5;
+
+        let cpu_face = cpu_face::CpuFace::new(gba, cpu_head_xpos, cpu_head_ypos, cpu_sprites);
+
         Self {
             gba,
             red_token_animation_controller,
@@ -63,6 +79,7 @@ impl<'a> GameScreen<'a> {
             _board_slot_objects,
             game_state,
             game_board,
+            cpu_face,
         }
     }
 
@@ -74,6 +91,7 @@ impl<'a> GameScreen<'a> {
                 &mut self.yellow_token_animation_controller,
                 &mut self.red_token_animation_controller,
                 &mut self.game_board,
+                &mut self.cpu_face,
             ),
             GameState::CpuTurnState(ref mut cpu_turn) => take_turn(
                 cpu_turn,
@@ -81,6 +99,7 @@ impl<'a> GameScreen<'a> {
                 &mut self.yellow_token_animation_controller,
                 &mut self.red_token_animation_controller,
                 &mut self.game_board,
+                &mut self.cpu_face,
             ),
         };
 
@@ -113,6 +132,15 @@ impl<'a> GameScreen<'a> {
             // TODO - Handle rest.
             TurnOutcome::Continue => {}
             TurnOutcome::Victory => {
+                match self.game_state {
+                    GameState::PlayerTurnState(_) => {
+                        self.cpu_face.set_emotion(cpu_face::CpuEmotion::Sad);
+                    }
+                    GameState::CpuTurnState(_) => {
+                        self.cpu_face.set_emotion(cpu_face::CpuEmotion::Happy);
+                    }
+                }
+
                 panic!("Done")
             }
         }
@@ -125,6 +153,7 @@ fn take_turn<'a, T: Turn>(
     yellow_token_animation_controller: &mut AnimationController<'a, 4>,
     red_token_animation_controller: &mut AnimationController<'a, 4>,
     game_board: &mut game_board::GameBoard,
+    cpu_face: &mut cpu_face::CpuFace,
 ) -> (Player, TurnOutcome) {
     let player = turn.get_player();
 
@@ -133,7 +162,7 @@ fn take_turn<'a, T: Turn>(
         Player::Yellow => yellow_token_animation_controller,
     };
 
-    let outcome = turn.update(gba, animation_controller, game_board);
+    let outcome = turn.update(gba, animation_controller, game_board, cpu_face);
     (player, outcome)
 }
 

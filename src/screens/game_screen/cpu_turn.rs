@@ -1,6 +1,7 @@
 use crate::system::constants::BOARD_COLUMNS;
 use crate::system::gba::GBA;
 
+use super::cpu_face::{CpuEmotion, CpuFace};
 use super::game_board;
 use super::turn::{Turn, TurnOutcome};
 use super::Player;
@@ -52,6 +53,7 @@ impl Turn for CpuTurn {
         _gba: &GBA,
         animation_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
+        cpu_face: &mut CpuFace,
     ) -> TurnOutcome {
         let player = self.get_player();
 
@@ -63,7 +65,7 @@ impl Turn for CpuTurn {
                     let moving_state = MovingState::new(self.cursor_position, best_column);
                     self.state = CpuState::Moving(moving_state);
                 } else {
-                    deciding.score_next_column(player, game_board);
+                    deciding.score_next_column(player, game_board, cpu_face);
                 }
                 TurnOutcome::Continue
             }
@@ -78,6 +80,7 @@ impl Turn for CpuTurn {
                         if game_board.is_winning_token(col, row, self.player) {
                             TurnOutcome::Victory
                         } else {
+                            cpu_face.set_emotion(CpuEmotion::Neutral);
                             TurnOutcome::NextTurn
                         }
                     } else {
@@ -100,8 +103,14 @@ impl Turn for CpuTurn {
 }
 
 impl DecidingState {
-    pub fn score_next_column(&mut self, player: Player, game_board: &mut game_board::GameBoard) {
-        let score = self.score_column(player, game_board, self.scored_columns);
+    pub fn score_next_column(
+        &mut self,
+        player: Player,
+        game_board: &mut game_board::GameBoard,
+        cpu_face: &mut CpuFace,
+    ) {
+        let score = self.score_column(player, game_board, self.scored_columns, cpu_face);
+
         self.col_scores[self.scored_columns] = Some(score);
         self.scored_columns += 1;
     }
@@ -120,6 +129,7 @@ impl DecidingState {
         player: Player,
         game_board: &mut game_board::GameBoard,
         column_number: usize,
+        cpu_face: &mut CpuFace,
     ) -> i32 {
         let row = game_board.get_next_free_row(column_number);
 
@@ -136,11 +146,13 @@ impl DecidingState {
 
         // First priority is to choose a winning move.
         if game_board.player_can_win(column_number, player) {
+            cpu_face.set_emotion(CpuEmotion::Happy);
             return i32::MAX;
         };
 
         // Next priority is to block opponent's winning move.
         if game_board.player_can_win(column_number, opponent) {
+            cpu_face.set_emotion(CpuEmotion::Surprised);
             return i32::MAX - 1;
         }
 

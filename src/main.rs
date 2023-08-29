@@ -6,7 +6,7 @@ use gba::{
     video::Color,
 };
 use graphics::sprite::{BOARD_SLOT_SPRITE, PALETTE, RED_TOKEN_ANIMATION, YELLOW_TOKEN_ANIMATION};
-use screens::game_screen::GameScreen;
+use screens::game_screen::{cpu_face::CpuSprites, GameScreen};
 use system::gba::GBA;
 
 pub mod graphics;
@@ -48,12 +48,14 @@ extern "C" fn main() -> ! {
     let yellow_token_animation = YELLOW_TOKEN_ANIMATION.load(&gba);
     let red_token_animation = RED_TOKEN_ANIMATION.load(&gba);
     let board_slot_sprite = BOARD_SLOT_SPRITE.load(&gba);
+    let cpu_sprites = CpuSprites::new(&gba);
 
     let mut screen = Screen::Game(GameScreen::new(
         &gba,
         &red_token_animation,
         &yellow_token_animation,
         &board_slot_sprite,
+        &cpu_sprites,
     ));
 
     loop {

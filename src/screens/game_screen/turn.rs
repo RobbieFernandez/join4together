@@ -5,7 +5,7 @@ use crate::{
     system::gba::GBA,
 };
 
-use super::{game_board, Player};
+use super::{cpu_face::CpuFace, game_board, Player};
 
 pub enum TurnOutcome {
     Victory,
@@ -19,6 +19,7 @@ pub trait Turn {
         gba: &GBA,
         animation_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
+        cpu_face: &mut CpuFace,
     ) -> TurnOutcome;
 
     fn get_player(&self) -> Player;

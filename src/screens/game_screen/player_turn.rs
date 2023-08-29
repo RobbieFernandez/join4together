@@ -1,3 +1,4 @@
+use super::cpu_face::{CpuEmotion, CpuFace};
 use super::game_board;
 use super::turn::{Turn, TurnOutcome};
 use super::Player;
@@ -43,6 +44,7 @@ impl Turn for PlayerTurn {
         gba: &GBA,
         anim_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
+        cpu_face: &mut CpuFace,
     ) -> TurnOutcome {
         if gba.key_was_pressed(GbaKey::LEFT) {
             self.move_left();
@@ -53,6 +55,11 @@ impl Turn for PlayerTurn {
             let token_position = game_board.drop_token(col_number, self.player);
 
             if let Some((col, row)) = token_position {
+                // If the player blocks the CPU, then he should be angry.
+                if game_board.is_winning_token(col, row, self.player.opposite()) {
+                    cpu_face.set_emotion(CpuEmotion::Mad);
+                }
+
                 return if game_board.is_winning_token(col, row, self.player) {
                     TurnOutcome::Victory
                 } else {
