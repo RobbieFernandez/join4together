@@ -7,12 +7,6 @@ use crate::{
 
 use super::{cpu_face::CpuFace, game_board, Player};
 
-pub enum TurnOutcome {
-    Victory,
-    NextTurn,
-    Continue,
-}
-
 pub trait Turn {
     fn update(
         &mut self,
@@ -20,11 +14,14 @@ pub trait Turn {
         animation_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
         cpu_face: &mut CpuFace,
-    ) -> TurnOutcome;
+    ) -> Option<usize>;
 
     fn get_player(&self) -> Player;
 
+    // TODO - Refactor this to make use of the game_board methods.
     fn draw_cursor(&self, column_number: u16, animation_controller: &mut AnimationController<4>) {
+        animation_controller.set_visible();
+
         let oa = animation_controller
             .get_obj_attr_entry()
             .get_obj_attr_data();

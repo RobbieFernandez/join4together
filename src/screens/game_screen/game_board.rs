@@ -58,54 +58,39 @@ impl<'a> GameBoard<'a> {
         }
     }
 
-    pub fn drop_token(&mut self, column_number: usize, player: Player) -> Option<(usize, usize)> {
+    pub fn get_token_xpos_for_column(&self, column_number: usize) -> u16 {
+        let (start_x, _) = board_top_left_corner();
+        let token_width: u16 = RED_TOKEN_FRAME_0_SPRITE.width().try_into().unwrap();
+        let board_slot_width: u16 = BOARD_SLOT_SPRITE.width().try_into().unwrap();
+        let padding = (board_slot_width - token_width) / 2;
+
+        let column_number: u16 = column_number.try_into().unwrap();
+        start_x + column_number * board_slot_width + padding
+    }
+
+    pub fn get_token_ypos_for_row(&self, row_number: usize) -> u16 {
+        let board_slot_height: u16 = BOARD_SLOT_SPRITE.height().try_into().unwrap();
+
+        let row_number: u16 = row_number.try_into().unwrap();
+        SCREEN_HEIGHT - (row_number as u16 + 1) * board_slot_height
+    }
+
+    pub fn set_cell(&mut self, player: Player, column_number: usize, row_number: usize) -> usize {
         let num_columns: usize = BOARD_COLUMNS.try_into().unwrap();
         assert!(column_number < num_columns);
-
-        let row_index = self.get_next_free_row(column_number);
 
         let num_rows: usize = BOARD_ROWS.try_into().unwrap();
         let column_start = column_number * num_rows;
 
-        let (start_x, _) = board_top_left_corner();
-        let token_width: u16 = RED_TOKEN_FRAME_0_SPRITE.width().try_into().unwrap();
-        let board_slot_width: u16 = BOARD_SLOT_SPRITE.width().try_into().unwrap();
-        let xpadding = (board_slot_width - token_width) / 2;
+        let cell_index = column_start + row_number;
+        let cell = &mut self.matrix[cell_index];
 
-        let board_slot_height: u16 = BOARD_SLOT_SPRITE.height().try_into().unwrap();
+        // Mark this cell as occupied by the player.
+        cell.replace(player);
 
-        if let Some(i) = row_index {
-            let cell_index = column_start + i;
-            let cell = &mut self.matrix[cell_index];
-            let obj = &mut self.token_objects[cell_index];
-
-            // Mark this cell as occupied by the player.
-            cell.replace(player);
-
-            // Add an obj entry to draw this player's token here.
-            let sprite = match player {
-                Player::Red => self.red_token_sprite,
-                Player::Yellow => self.yellow_token_sprite,
-            };
-
-            let mut loaded_token_obj = sprite.create_obj_attr_entry(self.gba);
-            let obj_attr = loaded_token_obj.get_obj_attr_data();
-
-            let xpos = start_x + (column_number as u16) * board_slot_width + xpadding;
-
-            let ypos = SCREEN_HEIGHT - (i as u16 + 1) * board_slot_height;
-
-            obj_attr.0 = obj_attr.0.with_y(ypos);
-            obj_attr.1 = obj_attr.1.with_x(xpos);
-
-            loaded_token_obj.commit_to_memory();
-
-            obj.replace(loaded_token_obj);
-
-            Some((column_number, i))
-        } else {
-            None
-        }
+        // Add an obj entry to draw this player's token here.
+        self.add_token_obj(player, column_number, row_number);
+        cell_index
     }
 
     pub fn is_winning_token(&self, column: usize, row: usize, player: Player) -> bool {
@@ -163,6 +148,33 @@ impl<'a> GameBoard<'a> {
         let num_rows: usize = BOARD_ROWS.try_into().unwrap();
         let column_start = column_number * num_rows;
         (0..num_rows).find(|i| self.matrix[column_start + i].is_none())
+    }
+
+    pub fn get_token_obj_entry_mut(&mut self, index: usize) -> &mut Option<LoadedObjectEntry<'a>> {
+        &mut self.token_objects[index]
+    }
+
+    fn add_token_obj<'b>(&mut self, player: Player, col: usize, row: usize) -> usize {
+        let num_rows: usize = BOARD_ROWS.try_into().unwrap();
+        let column_start = col * num_rows;
+        let cell_index = column_start + row;
+
+        let x_pos = self.get_token_xpos_for_column(col);
+
+        let sprite = match player {
+            Player::Red => self.red_token_sprite,
+            Player::Yellow => self.yellow_token_sprite,
+        };
+
+        let obj_slot = &mut self.token_objects[cell_index];
+        let mut obj = sprite.create_obj_attr_entry(self.gba);
+
+        let attr = obj.get_obj_attr_data();
+        attr.1 = attr.1.with_x(x_pos);
+
+        obj_slot.replace(obj);
+
+        cell_index
     }
 
     fn move_index_in_direction(

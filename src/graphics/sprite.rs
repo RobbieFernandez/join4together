@@ -1,5 +1,5 @@
 use gba::video::{
-    obj::{ObjAttr, ObjDisplayStyle, ObjShape},
+    obj::{self, ObjAttr, ObjDisplayStyle, ObjShape},
     Tile4,
 };
 
@@ -177,6 +177,20 @@ impl<'a, const C: usize> AnimationController<'a, C> {
         }
 
         self.get_obj_attr_entry().commit_to_memory();
+    }
+
+    pub fn set_hidden(&mut self) {
+        let obj_entry = self.get_obj_attr_entry();
+        let attr = obj_entry.get_obj_attr_data();
+
+        attr.0 = attr.0.with_style(ObjDisplayStyle::NotDisplayed);
+    }
+
+    pub fn set_visible(&mut self) {
+        let obj_entry = self.get_obj_attr_entry();
+        let attr = obj_entry.get_obj_attr_data();
+
+        attr.0 = attr.0.with_style(ObjDisplayStyle::Normal);
     }
 }
 

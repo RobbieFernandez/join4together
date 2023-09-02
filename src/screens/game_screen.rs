@@ -4,9 +4,8 @@ use crate::graphics::sprite::{
 use crate::system::constants::SCREEN_WIDTH;
 use crate::system::{constants::BOARD_SLOTS, constants::SCREEN_HEIGHT, gba::GBA};
 use cpu_turn::CpuTurn;
-use gba::prelude::ObjDisplayStyle;
 use player_turn::PlayerTurn;
-use turn::{Turn, TurnOutcome};
+use turn::Turn;
 
 use self::cpu_face::CpuSprites;
 
@@ -16,16 +15,29 @@ mod game_board;
 mod player_turn;
 mod turn;
 
+const TOKEN_DROP_SPEED: u16 = 10;
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Player {
     Red,
     Yellow,
 }
 
-pub enum GameState {
+#[derive(Clone)]
+struct TokenDroppingState {
+    player: Player,
+    column: usize,
+    current_y: u16,
+    target_y: u16,
+    row: usize,
+    obj_index: usize,
+}
+
+#[derive(Clone)]
+enum GameState {
     PlayerTurnState(PlayerTurn),
     CpuTurnState(CpuTurn),
-    // TokenDropping(Player, usize),
+    TokenDropping(TokenDroppingState),
 }
 
 pub struct GameScreen<'a> {
@@ -84,65 +96,122 @@ impl<'a> GameScreen<'a> {
     }
 
     pub fn update(&mut self) {
-        let (current_player, turn_outcome) = match self.game_state {
-            GameState::PlayerTurnState(ref mut player_turn) => take_turn(
-                player_turn,
-                self.gba,
-                &mut self.yellow_token_animation_controller,
-                &mut self.red_token_animation_controller,
-                &mut self.game_board,
-                &mut self.cpu_face,
-            ),
-            GameState::CpuTurnState(ref mut cpu_turn) => take_turn(
-                cpu_turn,
-                self.gba,
-                &mut self.yellow_token_animation_controller,
-                &mut self.red_token_animation_controller,
-                &mut self.game_board,
-                &mut self.cpu_face,
-            ),
+        let mut state = self.get_state();
+
+        let new_state = match state {
+            GameState::PlayerTurnState(ref mut player_turn) => {
+                use core::fmt::Write;
+                use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel};
+                let log_level = MgbaMessageLevel::Debug;
+                if let Ok(mut logger) = MgbaBufferedLogger::try_new(log_level) {
+                    writeln!(logger, "Cursor (screen): {}", player_turn.cursor_position).ok();
+                }
+
+                self.update_turn(player_turn)
+            }
+            GameState::CpuTurnState(ref mut cpu_turn) => self.update_turn(cpu_turn),
+            GameState::TokenDropping(ref mut token_state) => {
+                self.update_token_dropping(token_state)
+            }
         };
 
-        match turn_outcome {
-            TurnOutcome::NextTurn => {
-                let anim_controller = match current_player {
-                    Player::Red => &mut self.red_token_animation_controller,
-                    Player::Yellow => &mut self.yellow_token_animation_controller,
-                };
+        if let Some(new_state) = new_state {
+            self.game_state = new_state;
+        } else {
+            self.game_state = state;
+        }
+    }
 
-                let oa_entry = anim_controller.get_obj_attr_entry();
-                let oa_attr = oa_entry.get_obj_attr_data();
+    fn get_state(&self) -> GameState {
+        self.game_state.clone()
+    }
 
-                oa_attr.0 = oa_attr.0.with_style(ObjDisplayStyle::NotDisplayed);
-                oa_entry.commit_to_memory();
+    fn update_turn<T>(&mut self, turn: &mut T) -> Option<GameState>
+    where
+        T: Turn,
+    {
+        let (player, column) = take_turn(
+            turn,
+            self.gba,
+            &mut self.yellow_token_animation_controller,
+            &mut self.red_token_animation_controller,
+            &mut self.game_board,
+            &mut self.cpu_face,
+        );
 
-                let next_player = current_player.opposite();
+        if let Some(column) = column {
+            let row = self.game_board.get_next_free_row(column);
 
-                self.game_state = match self.game_state {
-                    GameState::PlayerTurnState(_) => {
-                        let turn = CpuTurn::new(next_player);
-                        GameState::CpuTurnState(turn)
-                    }
-                    GameState::CpuTurnState(_) => {
-                        let turn = PlayerTurn::new(next_player);
-                        GameState::PlayerTurnState(turn)
-                    }
+            match row {
+                Some(row) => {
+                    let obj_index = self.game_board.set_cell(player, column, row);
+
+                    let drop_state = TokenDroppingState {
+                        player,
+                        column,
+                        row,
+                        obj_index: obj_index,
+                        current_y: 0,
+                        target_y: self.game_board.get_token_ypos_for_row(row),
+                    };
+                    Some(GameState::TokenDropping(drop_state))
+                }
+                None => {
+                    panic!("No more rows!");
                 }
             }
-            // TODO - Handle rest.
-            TurnOutcome::Continue => {}
-            TurnOutcome::Victory => {
-                match self.game_state {
-                    GameState::PlayerTurnState(_) => {
-                        self.cpu_face.set_emotion(cpu_face::CpuEmotion::Sad);
-                    }
-                    GameState::CpuTurnState(_) => {
-                        self.cpu_face.set_emotion(cpu_face::CpuEmotion::Happy);
-                    }
+        } else {
+            None
+        }
+    }
+
+    fn update_token_dropping(&mut self, state: &mut TokenDroppingState) -> Option<GameState> {
+        state.current_y = state.current_y + TOKEN_DROP_SPEED;
+
+        self.update_token_dropping_obj(state);
+
+        let new_state = if state.current_y >= state.target_y {
+            // Turn is over now.
+            // Check victory conditions, otherwise move to next player's turn.
+            if self
+                .game_board
+                .is_winning_token(state.column, state.row, state.player)
+            {
+                // TODO - Transition to game over screen.
+                if state.player == Player::Red {
+                    self.cpu_face.set_emotion(cpu_face::CpuEmotion::Sad);
                 }
 
-                panic!("Done")
+                panic!("Game's over");
+            } else {
+                // TODO - Don't hardcode CPU/Player.
+                match state.player {
+                    Player::Red => Some(GameState::CpuTurnState(CpuTurn::new(
+                        state.player.opposite(),
+                    ))),
+                    Player::Yellow => Some(GameState::PlayerTurnState(PlayerTurn::new(
+                        state.player.opposite(),
+                    ))),
+                }
             }
+        } else {
+            None
+        };
+
+        new_state
+    }
+
+    fn update_token_dropping_obj(&mut self, state: &mut TokenDroppingState) {
+        let y_pos = state.current_y;
+        let obj = self.game_board.get_token_obj_entry_mut(state.obj_index);
+
+        match obj {
+            Some(obj) => {
+                let attr = obj.get_obj_attr_data();
+                attr.0 = attr.0.with_y(y_pos);
+                obj.commit_to_memory();
+            }
+            None => {}
         }
     }
 }
@@ -154,7 +223,7 @@ fn take_turn<'a, T: Turn>(
     red_token_animation_controller: &mut AnimationController<'a, 4>,
     game_board: &mut game_board::GameBoard,
     cpu_face: &mut cpu_face::CpuFace,
-) -> (Player, TurnOutcome) {
+) -> (Player, Option<usize>) {
     let player = turn.get_player();
 
     let animation_controller = match player {
@@ -162,8 +231,8 @@ fn take_turn<'a, T: Turn>(
         Player::Yellow => yellow_token_animation_controller,
     };
 
-    let outcome = turn.update(gba, animation_controller, game_board, cpu_face);
-    (player, outcome)
+    let column = turn.update(gba, animation_controller, game_board, cpu_face);
+    (player, column)
 }
 
 impl Player {

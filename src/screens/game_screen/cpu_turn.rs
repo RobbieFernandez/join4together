@@ -3,29 +3,33 @@ use crate::system::gba::GBA;
 
 use super::cpu_face::{CpuEmotion, CpuFace};
 use super::game_board;
-use super::turn::{Turn, TurnOutcome};
+use super::turn::Turn;
 use super::Player;
 use crate::graphics::sprite::AnimationController;
 
 const NUM_COLUMNS: usize = BOARD_COLUMNS as usize;
 const MOVEMENT_SPEED: u32 = 15;
 
+#[derive(Clone)]
 struct DecidingState {
     col_scores: [Option<i32>; NUM_COLUMNS],
     scored_columns: usize,
 }
 
+#[derive(Clone)]
 struct MovingState {
     current_column: usize,
     target_column: usize,
     timer: u32,
 }
 
+#[derive(Clone)]
 enum CpuState {
     Deciding(DecidingState),
     Moving(MovingState),
 }
 
+#[derive(Clone)]
 pub struct CpuTurn {
     player: Player,
     cursor_position: usize,
@@ -54,10 +58,10 @@ impl Turn for CpuTurn {
         animation_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
         cpu_face: &mut CpuFace,
-    ) -> TurnOutcome {
+    ) -> Option<usize> {
         let player = self.get_player();
 
-        let turn_outcome = match self.state {
+        match self.state {
             CpuState::Deciding(ref mut deciding) => {
                 let best_column = deciding.get_best_column();
 
@@ -67,34 +71,33 @@ impl Turn for CpuTurn {
                 } else {
                     deciding.score_next_column(player, game_board, cpu_face);
                 }
-                TurnOutcome::Continue
             }
             CpuState::Moving(ref mut moving) => {
                 let (finished_moving, new_cursor_pos) = moving.update();
                 self.cursor_position = new_cursor_pos;
 
                 if finished_moving {
-                    let token_position = game_board.drop_token(self.cursor_position, self.player);
+                    let row = game_board.get_next_free_row(self.cursor_position);
 
-                    if let Some((col, row)) = token_position {
-                        if game_board.is_winning_token(col, row, self.player) {
-                            TurnOutcome::Victory
-                        } else {
+                    if let Some(row) = row {
+                        if !game_board.is_winning_token(self.cursor_position, row, self.player) {
                             cpu_face.set_emotion(CpuEmotion::Neutral);
-                            TurnOutcome::NextTurn
                         }
+
+                        animation_controller.set_hidden();
+                        animation_controller.get_obj_attr_entry().commit_to_memory();
+
+                        return Some(self.cursor_position);
                     } else {
                         panic!("CPU chose invalid best move.")
                     }
-                } else {
-                    TurnOutcome::Continue
                 }
             }
         };
 
         self.draw_cursor(self.cursor_position as u16, animation_controller);
 
-        turn_outcome
+        None
     }
 
     fn get_player(&self) -> Player {

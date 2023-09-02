@@ -1,6 +1,6 @@
 use super::cpu_face::{CpuEmotion, CpuFace};
 use super::game_board;
-use super::turn::{Turn, TurnOutcome};
+use super::turn::Turn;
 use super::Player;
 use crate::graphics::sprite::AnimationController;
 use crate::system::{
@@ -8,9 +8,10 @@ use crate::system::{
     gba::{GbaKey, GBA},
 };
 
+#[derive(Clone)]
 pub struct PlayerTurn {
     player: Player,
-    cursor_position: u8,
+    pub cursor_position: u8,
 }
 
 impl PlayerTurn {
@@ -45,32 +46,37 @@ impl Turn for PlayerTurn {
         anim_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
         cpu_face: &mut CpuFace,
-    ) -> TurnOutcome {
+    ) -> Option<usize> {
+        use core::fmt::Write;
+        use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel};
+        let log_level = MgbaMessageLevel::Debug;
+        if let Ok(mut logger) = MgbaBufferedLogger::try_new(log_level) {
+            writeln!(logger, "Cursor (turn): {}", self.cursor_position).ok();
+        }
+
         if gba.key_was_pressed(GbaKey::LEFT) {
             self.move_left();
         } else if gba.key_was_pressed(GbaKey::RIGHT) {
             self.move_right();
         } else if gba.key_was_pressed(GbaKey::A) {
-            let col_number: usize = self.cursor_position.try_into().unwrap();
-            let token_position = game_board.drop_token(col_number, self.player);
+            let col: usize = self.cursor_position.try_into().unwrap();
+            let row = game_board.get_next_free_row(col);
+            anim_controller.set_hidden();
+            anim_controller.get_obj_attr_entry().commit_to_memory();
 
-            if let Some((col, row)) = token_position {
+            if let Some(row) = row {
                 // If the player blocks the CPU, then he should be angry.
                 if game_board.is_winning_token(col, row, self.player.opposite()) {
                     cpu_face.set_emotion(CpuEmotion::Mad);
                 }
 
-                return if game_board.is_winning_token(col, row, self.player) {
-                    TurnOutcome::Victory
-                } else {
-                    TurnOutcome::NextTurn
-                };
+                return Some(col);
             }
         }
 
         self.draw_cursor(self.cursor_position as u16, anim_controller);
 
-        TurnOutcome::Continue
+        None
     }
 
     fn get_player(&self) -> Player {
