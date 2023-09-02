@@ -1,3 +1,5 @@
+use core::cmp::min;
+
 use crate::graphics::sprite::{
     AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite,
 };
@@ -166,11 +168,11 @@ impl<'a> GameScreen<'a> {
     }
 
     fn update_token_dropping(&mut self, state: &mut TokenDroppingState) -> Option<GameState> {
-        state.current_y += TOKEN_DROP_SPEED;
+        state.current_y = min(state.current_y + TOKEN_DROP_SPEED, state.target_y);
 
         self.update_token_dropping_obj(state);
 
-        if state.current_y >= state.target_y {
+        if state.current_y == state.target_y {
             // Turn is over now.
             // Check victory conditions, otherwise move to next player's turn.
             if self
