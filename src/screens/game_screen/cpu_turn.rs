@@ -1,14 +1,17 @@
+use core::cmp::Ordering;
+
 use crate::system::constants::BOARD_COLUMNS;
 use crate::system::gba::GBA;
 
 use super::cpu_face::{CpuEmotion, CpuFace};
+use super::cursor::Cursor;
 use super::game_board;
 use super::turn::Turn;
 use super::Player;
 use crate::graphics::sprite::AnimationController;
 
 const NUM_COLUMNS: usize = BOARD_COLUMNS as usize;
-const MOVEMENT_SPEED: u32 = 15;
+const MOVEMENT_DELAY: u32 = 6;
 
 #[derive(Clone)]
 struct DecidingState {
@@ -18,9 +21,8 @@ struct DecidingState {
 
 #[derive(Clone)]
 struct MovingState {
-    current_column: usize,
     target_column: usize,
-    timer: u32,
+    move_delay_timer: u32,
 }
 
 #[derive(Clone)]
@@ -32,8 +34,8 @@ enum CpuState {
 #[derive(Clone)]
 pub struct CpuTurn {
     player: Player,
-    cursor_position: usize,
     state: CpuState,
+    cursor: Cursor,
 }
 
 impl CpuTurn {
@@ -45,8 +47,8 @@ impl CpuTurn {
 
         Self {
             player,
-            cursor_position: 0,
             state: CpuState::Deciding(deciding_state),
+            cursor: Cursor::new(),
         }
     }
 }
@@ -66,28 +68,28 @@ impl Turn for CpuTurn {
                 let best_column = deciding.get_best_column();
 
                 if let Some(best_column) = best_column {
-                    let moving_state = MovingState::new(self.cursor_position, best_column);
+                    let moving_state = MovingState::new(best_column);
                     self.state = CpuState::Moving(moving_state);
                 } else {
                     deciding.score_next_column(player, game_board, cpu_face);
                 }
             }
             CpuState::Moving(ref mut moving) => {
-                let (finished_moving, new_cursor_pos) = moving.update();
-                self.cursor_position = new_cursor_pos;
+                let finished_moving = moving.update(&mut self.cursor);
 
                 if finished_moving {
-                    let row = game_board.get_next_free_row(self.cursor_position);
+                    let column = self.cursor.get_column();
+                    let row = game_board.get_next_free_row(column);
 
                     if let Some(row) = row {
-                        if !game_board.is_winning_token(self.cursor_position, row, self.player) {
+                        if !game_board.is_winning_token(column, row, self.player) {
                             cpu_face.set_emotion(CpuEmotion::Neutral);
                         }
 
                         animation_controller.set_hidden();
                         animation_controller.get_obj_attr_entry().commit_to_memory();
 
-                        return Some(self.cursor_position);
+                        return Some(column);
                     } else {
                         panic!("CPU chose invalid best move.")
                     }
@@ -95,7 +97,7 @@ impl Turn for CpuTurn {
             }
         };
 
-        self.draw_cursor(self.cursor_position as u16, animation_controller);
+        self.cursor.draw(animation_controller);
 
         None
     }
@@ -195,35 +197,41 @@ impl DecidingState {
 }
 
 impl MovingState {
-    pub fn new(starting_column: usize, target_column: usize) -> Self {
+    pub fn new(target_column: usize) -> Self {
         Self {
             target_column,
-            current_column: starting_column,
-            timer: MOVEMENT_SPEED,
+            move_delay_timer: MOVEMENT_DELAY,
         }
     }
 
-    pub fn update(&mut self) -> (bool, usize) {
-        self.timer -= 1;
-        let finished = self.timer == 0 && self.current_column == self.target_column;
+    pub fn update(&mut self, cursor: &mut Cursor) -> bool {
+        cursor.update_movement();
 
-        if finished {
-            (true, self.target_column)
-        } else {
-            if self.timer == 0 {
-                self.move_cursor();
-                self.timer = MOVEMENT_SPEED;
+        if !cursor.is_moving() && self.update_timer() {
+            match cursor.get_column().cmp(&self.target_column) {
+                Ordering::Greater => {
+                    cursor.move_left();
+                }
+                Ordering::Less => {
+                    cursor.move_right();
+                }
+                Ordering::Equal => {
+                    return true;
+                }
             }
-
-            (false, self.current_column)
         }
+
+        false
     }
 
-    fn move_cursor(&mut self) {
-        if self.current_column < self.target_column {
-            self.current_column += 1;
+    fn update_timer(&mut self) -> bool {
+        self.move_delay_timer -= 1;
+
+        if self.move_delay_timer == 0 {
+            self.move_delay_timer = MOVEMENT_DELAY;
+            true
         } else {
-            self.current_column -= 1;
+            false
         }
     }
 }

@@ -58,16 +58,6 @@ impl<'a> GameBoard<'a> {
         }
     }
 
-    pub fn get_token_xpos_for_column(&self, column_number: usize) -> u16 {
-        let (start_x, _) = board_top_left_corner();
-        let token_width: u16 = RED_TOKEN_FRAME_0_SPRITE.width().try_into().unwrap();
-        let board_slot_width: u16 = BOARD_SLOT_SPRITE.width().try_into().unwrap();
-        let padding = (board_slot_width - token_width) / 2;
-
-        let column_number: u16 = column_number.try_into().unwrap();
-        start_x + column_number * board_slot_width + padding
-    }
-
     pub fn get_token_ypos_for_row(&self, row_number: usize) -> u16 {
         let board_slot_height: u16 = BOARD_SLOT_SPRITE.height().try_into().unwrap();
 
@@ -158,7 +148,7 @@ impl<'a> GameBoard<'a> {
         let column_start = col * num_rows;
         let cell_index = column_start + row;
 
-        let x_pos = self.get_token_xpos_for_column(col);
+        let x_pos = get_token_x_position(col);
 
         let sprite = match player {
             Player::Red => self.red_token_sprite,
@@ -381,4 +371,14 @@ pub fn get_token_y_position() -> u16 {
     let token_height: u16 = RED_TOKEN_FRAME_0_SPRITE.height().try_into().unwrap();
 
     start_y / 2 - token_height / 2
+}
+
+pub fn get_token_x_position(column_number: usize) -> u16 {
+    let (start_x, _) = board_top_left_corner();
+    let token_width: u16 = RED_TOKEN_FRAME_0_SPRITE.width().try_into().unwrap();
+    let board_slot_width: u16 = BOARD_SLOT_SPRITE.width().try_into().unwrap();
+    let padding = (board_slot_width - token_width) / 2;
+
+    let column_number: u16 = column_number.try_into().unwrap();
+    start_x + column_number * board_slot_width + padding
 }

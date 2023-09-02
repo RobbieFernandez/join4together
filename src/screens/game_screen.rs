@@ -13,6 +13,7 @@ use self::cpu_face::CpuSprites;
 
 pub mod cpu_face;
 mod cpu_turn;
+mod cursor;
 mod game_board;
 mod player_turn;
 mod turn;
@@ -104,16 +105,7 @@ impl<'a> GameScreen<'a> {
         let mut state = self.get_state();
 
         let new_state = match state {
-            GameState::PlayerTurnState(ref mut player_turn) => {
-                use core::fmt::Write;
-                use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel};
-                let log_level = MgbaMessageLevel::Debug;
-                if let Ok(mut logger) = MgbaBufferedLogger::try_new(log_level) {
-                    writeln!(logger, "Cursor (screen): {}", player_turn.cursor_position).ok();
-                }
-
-                self.update_turn(player_turn)
-            }
+            GameState::PlayerTurnState(ref mut player_turn) => self.update_turn(player_turn),
             GameState::CpuTurnState(ref mut cpu_turn) => self.update_turn(cpu_turn),
             GameState::TokenDropping(ref mut token_state) => {
                 self.update_token_dropping(token_state)
