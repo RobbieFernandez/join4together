@@ -22,10 +22,6 @@ impl PlayerTurn {
         }
     }
 
-    pub fn get_player(&self) -> Player {
-        self.player
-    }
-
     fn move_left(&mut self) {
         if self.cursor_position == 0 {
             self.cursor_position = BOARD_COLUMNS;

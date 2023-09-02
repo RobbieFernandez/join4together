@@ -72,7 +72,7 @@ impl<'a> GameBoard<'a> {
         let board_slot_height: u16 = BOARD_SLOT_SPRITE.height().try_into().unwrap();
 
         let row_number: u16 = row_number.try_into().unwrap();
-        SCREEN_HEIGHT - (row_number as u16 + 1) * board_slot_height
+        SCREEN_HEIGHT - (row_number + 1) * board_slot_height
     }
 
     pub fn set_cell(&mut self, player: Player, column_number: usize, row_number: usize) -> usize {
@@ -154,7 +154,7 @@ impl<'a> GameBoard<'a> {
         &mut self.token_objects[index]
     }
 
-    fn add_token_obj<'b>(&mut self, player: Player, col: usize, row: usize) -> usize {
+    fn add_token_obj(&mut self, player: Player, col: usize, row: usize) -> usize {
         let num_rows: usize = BOARD_ROWS.try_into().unwrap();
         let column_start = col * num_rows;
         let cell_index = column_start + row;
@@ -300,7 +300,7 @@ impl<'a> GameBoard<'a> {
         column: usize,
         row: usize,
     ) -> bool {
-        let positive_distance = self.get_connected_distance(column, row, &direction, player);
+        let positive_distance = self.get_connected_distance(column, row, direction, player);
 
         if positive_distance >= 3 {
             true

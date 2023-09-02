@@ -150,7 +150,7 @@ impl<'a> GameScreen<'a> {
                         player,
                         column,
                         row,
-                        obj_index: obj_index,
+                        obj_index,
                         current_y: 0,
                         target_y: self.game_board.get_token_ypos_for_row(row),
                     };
@@ -166,11 +166,11 @@ impl<'a> GameScreen<'a> {
     }
 
     fn update_token_dropping(&mut self, state: &mut TokenDroppingState) -> Option<GameState> {
-        state.current_y = state.current_y + TOKEN_DROP_SPEED;
+        state.current_y += TOKEN_DROP_SPEED;
 
         self.update_token_dropping_obj(state);
 
-        let new_state = if state.current_y >= state.target_y {
+        if state.current_y >= state.target_y {
             // Turn is over now.
             // Check victory conditions, otherwise move to next player's turn.
             if self
@@ -196,12 +196,10 @@ impl<'a> GameScreen<'a> {
             }
         } else {
             None
-        };
-
-        new_state
+        }
     }
 
-    fn update_token_dropping_obj(&mut self, state: &mut TokenDroppingState) {
+    fn update_token_dropping_obj(&mut self, state: &TokenDroppingState) {
         let y_pos = state.current_y;
         let obj = self.game_board.get_token_obj_entry_mut(state.obj_index);
 

@@ -1,5 +1,5 @@
 use gba::video::{
-    obj::{self, ObjAttr, ObjDisplayStyle, ObjShape},
+    obj::{ObjAttr, ObjDisplayStyle, ObjShape},
     Tile4,
 };
 

@@ -6,7 +6,7 @@ use crate::graphics::sprite::{
 };
 
 pub struct CpuSprites<'a> {
-    gba: &'a GBA,
+    _gba: &'a GBA,
     cpu_head_sprite: LoadedSprite<'a>,
     cpu_neutral_face_sprite: LoadedSprite<'a>,
     cpu_happy_face_sprite: LoadedSprite<'a>,
@@ -16,8 +16,8 @@ pub struct CpuSprites<'a> {
 }
 
 pub struct CpuFace<'a> {
-    gba: &'a GBA,
-    cpu_head_obj: LoadedObjectEntry<'a>,
+    _gba: &'a GBA,
+    _cpu_head_obj: LoadedObjectEntry<'a>,
     cpu_face_obj: LoadedObjectEntry<'a>,
     cpu_sprites: &'a CpuSprites<'a>,
 }
@@ -41,13 +41,13 @@ impl<'a> CpuSprites<'a> {
         let cpu_sad_face_sprite = CPU_FACE_SAD_SPRITE.load(gba);
 
         Self {
-            gba: gba,
             cpu_head_sprite,
             cpu_neutral_face_sprite,
             cpu_happy_face_sprite,
             cpu_mad_face_sprite,
             cpu_surprised_face_sprite,
             cpu_sad_face_sprite,
+            _gba: gba,
         }
     }
 
@@ -82,10 +82,10 @@ impl<'a> CpuFace<'a> {
         }
 
         Self {
-            gba,
-            cpu_head_obj,
             cpu_face_obj,
             cpu_sprites,
+            _cpu_head_obj: cpu_head_obj,
+            _gba: gba,
         }
     }
 
