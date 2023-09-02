@@ -17,7 +17,9 @@ mod game_board;
 mod player_turn;
 mod turn;
 
-const TOKEN_DROP_SPEED: u16 = 10;
+const TOKEN_DROP_TOP_SPEED: u16 = 15;
+const TOKEN_DROP_SPEED_GRADIENT: u16 = 1;
+const TOKEN_DROP_STARTING_SPEED: u16 = 1;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Player {
@@ -33,6 +35,7 @@ struct TokenDroppingState {
     target_y: u16,
     row: usize,
     obj_index: usize,
+    speed: u16,
 }
 
 #[derive(Clone)]
@@ -147,15 +150,18 @@ impl<'a> GameScreen<'a> {
             match row {
                 Some(row) => {
                     let obj_index = self.game_board.set_cell(player, column, row);
+                    let y_pos = game_board::get_token_y_position();
 
                     let drop_state = TokenDroppingState {
                         player,
                         column,
                         row,
                         obj_index,
-                        current_y: 0,
+                        current_y: y_pos,
+                        speed: TOKEN_DROP_STARTING_SPEED,
                         target_y: self.game_board.get_token_ypos_for_row(row),
                     };
+
                     Some(GameState::TokenDropping(drop_state))
                 }
                 None => {
@@ -168,7 +174,11 @@ impl<'a> GameScreen<'a> {
     }
 
     fn update_token_dropping(&mut self, state: &mut TokenDroppingState) -> Option<GameState> {
-        state.current_y = min(state.current_y + TOKEN_DROP_SPEED, state.target_y);
+        state.current_y = min(state.current_y + state.speed, state.target_y);
+        state.speed = min(
+            state.speed + TOKEN_DROP_SPEED_GRADIENT,
+            TOKEN_DROP_TOP_SPEED,
+        );
 
         self.update_token_dropping_obj(state);
 

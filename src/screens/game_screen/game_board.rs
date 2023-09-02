@@ -89,8 +89,7 @@ impl<'a> GameBoard<'a> {
         cell.replace(player);
 
         // Add an obj entry to draw this player's token here.
-        self.add_token_obj(player, column_number, row_number);
-        cell_index
+        self.add_token_obj(player, column_number, row_number)
     }
 
     pub fn is_winning_token(&self, column: usize, row: usize, player: Player) -> bool {
@@ -375,4 +374,11 @@ impl Direction {
             Direction::NorthWest => Direction::SouthEast,
         }
     }
+}
+
+pub fn get_token_y_position() -> u16 {
+    let (_, start_y) = board_top_left_corner();
+    let token_height: u16 = RED_TOKEN_FRAME_0_SPRITE.height().try_into().unwrap();
+
+    start_y / 2 - token_height / 2
 }
