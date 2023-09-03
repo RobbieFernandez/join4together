@@ -179,7 +179,7 @@ where
 
     quote!(
         pub static #struct_name: #animation_struct_type = Animation {
-            tick_rate: 5u8,
+            tick_rate: 6u8,
             sprites: #frame_arr
         };
     )
