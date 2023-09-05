@@ -16,7 +16,10 @@ pub struct MemoryBlockManager<T, R, W, const C: usize> {
 }
 
 impl<'a, T, R, W, const C: usize> ClaimedVolRegion<'a, T, R, W, C> {
-    fn new(block: &VolBlock<T, R, W, C>, claimed_memory_range: ClaimedMemoryRange<'a, C>) -> Self {
+    fn new(
+        block: &'a VolBlock<T, R, W, C>,
+        claimed_memory_range: ClaimedMemoryRange<'a, C>,
+    ) -> Self {
         let addr_range = claimed_memory_range.address_range();
         let region = block.as_region();
 
