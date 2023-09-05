@@ -1,18 +1,19 @@
 use core::cmp::Ordering;
 
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote};
 use syn::Ident;
 
 use crate::{
     palette,
-    tiles::{convert_sprite_to_tiles, Tile4, TileVec},
-    SpriteWithPalette,
+    sprites::SpriteWithPalette,
+    tiles::{convert_sprite_to_tiles, TileVec},
 };
 
-pub fn generate_palette_array_src(palette: &palette::Palette) -> String {
+pub fn generate_palette_array_src(palette: &palette::Palette, var_prefix: &str) -> String {
+    let ident = format_ident!("{}_PALETTE", var_prefix);
+
     quote! {
-        pub static PALETTE: [u16; 256] = #palette;
+        pub static #ident: [gba::video::Color; 256] = #palette;
     }
     .to_string()
 }
@@ -184,47 +185,4 @@ where
         };
     )
     .to_string()
-}
-
-impl ToTokens for Tile4 {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let hex_literals: Vec<String> = self.iter().map(|i| format!("{:#0x}", i)).collect();
-        let hex_literals = hex_literals.join(", ");
-        let hex_literals = format!("[ {} ]", hex_literals);
-        let expr: syn::Expr = syn::parse_str(&hex_literals)
-            .expect("Error producing hex representation of sprite tiles.");
-
-        expr.to_tokens(tokens);
-    }
-}
-
-impl ToTokens for TileVec {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let tiles: Vec<String> = self
-            .iter()
-            .map(|tile| quote! { #tile }.to_string())
-            .collect();
-
-        let tiles = tiles.join(",");
-        let tiles = format!("&[ {} ]", tiles);
-
-        let expr: syn::Expr = syn::parse_str(&tiles).unwrap();
-        expr.to_tokens(tokens);
-    }
-}
-
-impl ToTokens for palette::Palette {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let tiles: Vec<String> = self
-            .iter()
-            .map(|tile| quote! { #tile }.to_string())
-            .collect();
-
-        let tiles = tiles.join(",");
-        let tiles = format!("[ {} ]", tiles);
-
-        let expr: syn::Expr =
-            syn::parse_str(&tiles).expect("Error producing hex representation of sprite palette.");
-        expr.to_tokens(tokens);
-    }
 }

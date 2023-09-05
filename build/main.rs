@@ -1,137 +1,44 @@
-use std::{env, fs::read_dir, path::Path};
+use std::{env, path::Path};
 
-use asefile::{util, AsepriteFile};
 use id_tree::{Node, TreeBuilder};
 use palette::{add_palette, resolve_palette};
 
+use crate::sprites::find_sprites;
+
+mod backgrounds;
 mod binpack;
-mod codegen;
+mod grid;
 mod palette;
+mod sprites;
 mod tiles;
 
-#[derive(Debug)]
-struct SpriteError;
-
-pub struct SpriteWithPalette {
-    name: String,
-    palette: palette::Palette,
-    width: usize,
-    height: usize,
-    image_data: Vec<Vec<u8>>,
-    transparency_index: Option<u8>,
-    num_frames: usize,
-}
-
-fn find_sprites(directory: &Path) -> Result<Vec<SpriteWithPalette>, SpriteError> {
-    // Find all .aseprite files in the directory
-    let entries = read_dir(directory).map_err(|_e| SpriteError)?;
-    let mut asefiles: Vec<SpriteWithPalette> = Vec::new();
-
-    for entry in entries {
-        let entry = entry.map_err(|_e| SpriteError)?;
-        let path = entry.path();
-
-        assert!(
-            path.is_file(),
-            "/sprites dir cannot contain nested directories."
-        );
-
-        let filename = entry
-            .file_name()
-            .to_ascii_uppercase()
-            .into_string()
-            .map_err(|_e| SpriteError)?;
-
-        let filename = filename.replace(".ASEPRITE", "");
-
-        let ase = AsepriteFile::read_file(&path).map_err(|_e| SpriteError)?;
-        asefiles.push(extract_sprite_palette(ase, filename));
-    }
-
-    Ok(asefiles)
-}
-
-fn extract_sprite_palette(ase: AsepriteFile, filename: String) -> SpriteWithPalette {
-    assert!(
-        ase.is_indexed_color(),
-        "Only indexed color mode can be used."
-    );
-
-    let mut image_data: Vec<Vec<u8>> = Vec::new();
-
-    let transparency_index = ase.transparent_color_index();
-
-    let raw_palette = ase.palette().unwrap();
-
-    let mapper = util::PaletteMapper::new(
-        raw_palette,
-        util::MappingOptions {
-            transparent: transparency_index,
-            failure: 0,
-        },
-    );
-
-    let pal_vec: Vec<u16> = (0..raw_palette.num_colors())
-        .map(|i| {
-            let full_color = raw_palette
-                .color(i)
-                .expect("Palette index not found in palette.");
-
-            // Convert each color into xbbbbggggrrrr
-
-            // Convert each channel from 8-bit into 5-bit (shift right by 3)
-            // Then wrap each channel in a u16 so we can combine them.
-            let red: u16 = u16::from(full_color.red() >> 3);
-            let green: u16 = u16::from(full_color.green() >> 3);
-            let blue: u16 = u16::from(full_color.blue() >> 3);
-
-            red | (green << 5) | (blue << 10)
-        })
-        .collect();
-
-    let palette = palette::Palette::new(pal_vec);
-
-    let width = ase.width();
-    let height = ase.height();
-
-    let num_frames: usize = ase
-        .num_frames()
-        .try_into()
-        .expect("Sprite contains too many frames.");
-
-    for f in 0..num_frames {
-        let f: u32 = f.try_into().unwrap();
-        let img = ase.frame(f).image();
-
-        // image_data is a 1-dimensional representation of a 2-dimensional matrix. Each
-        // element in the array represents an index, which identifies the colour in the palette
-        // belonging to that pixel.
-        let (_, frame_image_data) = util::to_indexed_image(img, &mapper);
-        image_data.push(frame_image_data);
-    }
-
-    SpriteWithPalette {
-        name: filename,
-        palette,
-        image_data,
-        transparency_index,
-        num_frames,
-        width,
-        height,
-    }
-}
-
 fn main() {
-    println!("cargo:rerun-if-changed=sprites/");
+    println!("cargo:rerun-if-changed=assets/");
 
     let base_dir = env::var("CARGO_MANIFEST_DIR")
         .expect("Error reading 'CARGO_MANIFEST_DIR' environment variable. ");
 
     let base_dir = Path::new(&base_dir);
 
-    let sprite_dir = Path::new(&"sprites");
-    let sprite_dir = base_dir.join(sprite_dir);
+    let output_dir = env::var("OUT_DIR").expect("Error reading 'OUT_DIR' environment variable. ");
+    let output_dir = Path::new(&output_dir);
 
+    // Generate sprite source code.
+    let sprite_dir = Path::new(&"assets/sprites");
+    let sprite_dir = base_dir.join(sprite_dir);
+    let sprite_source = get_sprite_source(&sprite_dir);
+
+    let sprite_output_file = output_dir.join(Path::new("sprite_data.rs"));
+    write_source(&sprite_source, &sprite_output_file);
+
+    // Generate background source code.
+    let background_dir = Path::new(&"assets/backgrounds");
+    let background_source = get_background_source(&background_dir);
+    let background_output_file = output_dir.join(Path::new("background_data.rs"));
+    write_source(&background_source, &background_output_file);
+}
+
+fn get_sprite_source(sprite_dir: &Path) -> String {
     let mut palette_tree = TreeBuilder::new()
         .with_root(Node::new(palette::Palette::new(vec![0])))
         .build();
@@ -145,26 +52,33 @@ fn main() {
     let palette_mapper = resolve_palette(palette_tree);
 
     let palette_source: String =
-        codegen::generate_palette_array_src(&palette_mapper.full_palette());
+        sprites::codegen::generate_palette_array_src(&palette_mapper.full_palette(), "OBJ");
 
     let struct_definitions: Vec<String> = sprites
         .iter()
-        .map(|s| codegen::generate_sprite_struct_src(s, &palette_mapper))
+        .map(|s| sprites::codegen::generate_sprite_struct_src(s, &palette_mapper))
         .collect();
 
     let struct_definitions: String = struct_definitions.join("\n");
 
-    let source = format!("{}\n{}", palette_source, struct_definitions);
+    format!("{}\n{}", palette_source, struct_definitions)
+}
 
-    let output_path = env::var("OUT_DIR").expect("Error reading 'OUT_DIR' environment variable. ");
+fn get_background_source(background_dir: &Path) -> String {
+    let backgrounds = backgrounds::find_backgrounds(background_dir);
+    let backgrounds = backgrounds.expect("Error building backgrounds."); // TODO - Better error handling.
 
-    let output_path = Path::new(&output_path);
-    let output_path = output_path.join(Path::new("sprite_data.rs"));
+    let background_definitions: Vec<String> = backgrounds
+        .iter()
+        .map(|b| backgrounds::codegen::generate_background_struct_src(b))
+        .collect();
 
-    write_source(&source, &output_path)
+    background_definitions.join("\n")
 }
 
 fn write_source(source_text: &str, output_path: &Path) {
+    // println!("cargo:warning={}", source_text);
+
     let syntax_tree: syn::File =
         syn::parse_str(source_text).expect("Error parsing generated code.");
 

@@ -1,11 +1,10 @@
 #![no_std]
 #![no_main]
 
-use gba::{
-    prelude::{MgbaBufferedLogger, MgbaMessageLevel},
-    video::Color,
+use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel};
+use graphics::sprite::{
+    BOARD_SLOT_SPRITE, OBJ_PALETTE, RED_TOKEN_ANIMATION, YELLOW_TOKEN_ANIMATION,
 };
-use graphics::sprite::{BOARD_SLOT_SPRITE, PALETTE, RED_TOKEN_ANIMATION, YELLOW_TOKEN_ANIMATION};
 use screens::game_screen::{cpu_face::CpuSprites, GameScreen};
 use system::gba::GBA;
 
@@ -34,15 +33,13 @@ extern "C" fn main() -> ! {
 
     let mut palette_mem = gba
         .obj_palette_memory
-        .request_memory(PALETTE.len())
+        .request_memory(OBJ_PALETTE.len())
         .expect("Object palette cannot fit in memory.");
 
     let palette_mem_region = palette_mem.as_vol_region();
 
-    for (i, pal_color) in PALETTE.iter().enumerate() {
-        let mut col = Color::new();
-        col.0 = *pal_color;
-        palette_mem_region.index(i).write(col);
+    for (i, color) in OBJ_PALETTE.iter().enumerate() {
+        palette_mem_region.index(i).write(*color);
     }
 
     let yellow_token_animation = YELLOW_TOKEN_ANIMATION.load(&gba);

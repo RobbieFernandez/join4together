@@ -1,7 +1,10 @@
 use std::ops::{Deref, DerefMut};
 
+use asefile::{ColorPalette, ColorPaletteEntry};
 use id_tree::InsertBehavior::*;
 use id_tree::*;
+use proc_macro2::TokenStream;
+use quote::{quote, ToTokens};
 
 use super::binpack::{binpack, Bin, BinItem};
 
@@ -20,6 +23,37 @@ impl Palette {
 
     fn contains(&self, other: &Self) -> bool {
         other.iter().all(|c| self._palette.contains(c))
+    }
+}
+
+impl From<&ColorPalette> for Palette {
+    fn from(color_palette: &ColorPalette) -> Self {
+        let num_colors = color_palette.num_colors();
+
+        let palette = (0..num_colors).map(|i| {
+            let pal_entry = color_palette.color(i).unwrap();
+            palette_entry_to_15bit_color(pal_entry)
+        });
+
+        let palette: Vec<u16> = palette.collect();
+
+        Self { _palette: palette }
+    }
+}
+
+impl ToTokens for Palette {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let tiles: Vec<String> = self
+            .iter()
+            .map(|tile| quote! { gba::video::Color(#tile) }.to_string())
+            .collect();
+
+        let tiles = tiles.join(",");
+        let tiles = format!("[ {} ]", tiles);
+
+        let expr: syn::Expr =
+            syn::parse_str(&tiles).expect("Error producing hex representation of palette colors.");
+        expr.to_tokens(tokens);
     }
 }
 
@@ -190,6 +224,16 @@ impl From<Vec<Palette>> for PaletteMapper {
 
         PaletteMapper { final_palette }
     }
+}
+
+pub fn palette_entry_to_15bit_color(palette_entry: &ColorPaletteEntry) -> u16 {
+    // Convert each channel from 8-bit into 5-bit (shift right by 3)
+    // Then wrap each channel in a u16 so we can combine them.
+    let red: u16 = u16::from(palette_entry.red() >> 3);
+    let green: u16 = u16::from(palette_entry.green() >> 3);
+    let blue: u16 = u16::from(palette_entry.blue() >> 3);
+
+    red | (green << 5) | (blue << 10)
 }
 
 impl PaletteMapper {

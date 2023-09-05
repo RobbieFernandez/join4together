@@ -1,6 +1,9 @@
 use std::{cmp::max, ops::Deref};
 
-use crate::{palette, SpriteWithPalette};
+use proc_macro2::TokenStream;
+use quote::{quote, ToTokens};
+
+use crate::{grid, palette, sprites::SpriteWithPalette};
 
 const TILE_SIZE: usize = 8;
 
@@ -54,6 +57,50 @@ impl Deref for TileVec {
     }
 }
 
+impl From<Vec<u8>> for Tile4 {
+    fn from(tile: Vec<u8>) -> Self {
+        let num_pixels = tile.len();
+        assert!(num_pixels == TILE_SIZE * TILE_SIZE);
+
+        let tile = unflatten_tiles(tile)[0];
+        let tile: [u32; 8] = tile
+            .iter()
+            .map(pack_tile_row)
+            .collect::<Vec<u32>>()
+            .try_into()
+            .expect("Tile row is not the corect size.");
+
+        Self { _data: tile }
+    }
+}
+
+impl ToTokens for Tile4 {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let hex_literals: Vec<String> = self.iter().map(|i| format!("{:#0x}", i)).collect();
+        let hex_literals = hex_literals.join(", ");
+        let hex_literals = format!("[ {} ]", hex_literals);
+        let expr: syn::Expr = syn::parse_str(&hex_literals)
+            .expect("Error producing hex representation of sprite tiles.");
+
+        expr.to_tokens(tokens);
+    }
+}
+
+impl ToTokens for TileVec {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let tiles: Vec<String> = self
+            .iter()
+            .map(|tile| quote! { #tile }.to_string())
+            .collect();
+
+        let tiles = tiles.join(",");
+        let tiles = format!("&[ {} ]", tiles);
+
+        let expr: syn::Expr = syn::parse_str(&tiles).unwrap();
+        expr.to_tokens(tokens);
+    }
+}
+
 /// Convert from the original Sprite representation, to a 1-dimensional vector of Tiles.
 pub fn convert_sprite_to_tiles(
     sprite: &SpriteWithPalette,
@@ -70,9 +117,17 @@ pub fn convert_sprite_to_tiles(
             .map(|i| mapped_palette.map_index(*i))
             .collect();
 
-        // Pad the vector to make sure the dimensions are a power of 2
-        let (converted_image_data, padded_width, padded_height) =
-            align_image_vec_to_tiles(converted_image_data, sprite.width, sprite.height);
+        // Sprites sizes must be powers of 2, and cannot be less than TILE_SIZE
+        let padded_width = max(sprite.width.next_power_of_two(), TILE_SIZE);
+        let padded_height = max(sprite.height.next_power_of_two(), TILE_SIZE);
+
+        let converted_image_data = grid::resize_grid(
+            converted_image_data,
+            sprite.width,
+            sprite.height,
+            padded_width,
+            padded_height,
+        );
 
         // Convert 1d index array into a vector of 2d tiles
         let (tiles, n_cols, n_rows) =
@@ -98,40 +153,6 @@ pub fn convert_sprite_to_tiles(
     }
 
     tile_vecs
-}
-
-// Pad the input vector to make sure the dimensions of the image are a power of 2.
-// This is done by adding transparent pixels along the right and bottom edges as needed.
-fn align_image_vec_to_tiles(
-    image_vec: Vec<u8>,
-    width: usize,
-    height: usize,
-) -> (Vec<u8>, usize, usize) {
-    let mut aligned: Vec<u8> = Vec::new();
-
-    let target_width = max(TILE_SIZE, width.next_power_of_two());
-    let target_height = max(TILE_SIZE, height.next_power_of_two());
-
-    let right_padding = target_width - width;
-    let bottom_padding = target_height - height;
-
-    if right_padding == 0 && bottom_padding == 0 {
-        // Already aligned
-        return (image_vec, target_width, target_height);
-    }
-
-    // Add each row, with padding, into the aligned vec.
-    for row in 0..height {
-        let row_start = row * width;
-        let mut row_slice = Vec::from(&image_vec[row_start..(row_start + width)]);
-        row_slice.resize(target_width, 0);
-        aligned.append(&mut row_slice);
-    }
-
-    // Add any needed extra rows
-    aligned.resize(target_width * target_height, 0);
-
-    (aligned, target_width, target_height)
 }
 
 /// From a 1-dimensional representation of an indexed image, create a 1-dimensional
