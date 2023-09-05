@@ -110,6 +110,16 @@ impl<'a> LoadedObjectEntry<'a> {
     }
 }
 
+impl<'a> Drop for LoadedObjectEntry<'a> {
+    fn drop(&mut self) {
+        // When we drop the ObjectEntry we should hide it first, otherwise it will stay visible on the screen
+        // until the memory is reused by another object.
+        let obj_attr = self.get_obj_attr_data();
+        obj_attr.0 = obj_attr.0.with_style(ObjDisplayStyle::NotDisplayed);
+        self.commit_to_memory();
+    }
+}
+
 impl<const C: usize> Animation<C> {
     pub fn load<'a>(&'a self, gba: &'a GBA) -> LoadedAnimation<'a, C> {
         let loaded_sprites = core::array::from_fn(|i| self.sprites[i].load(gba));

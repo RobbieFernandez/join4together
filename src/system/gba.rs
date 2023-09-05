@@ -9,6 +9,7 @@ pub use super::memory::series::ClaimedVolAddress;
 pub type PaletteMemory = MemoryBlockManager<Color, Safe, Safe, 256>;
 pub type ObjAttrMemory = MemorySeriesManager<ObjAttr, Safe, Safe, 128, 8>;
 pub type ObjTileMemory = MemoryBlockManager<Tile4, Safe, Safe, 1024>;
+pub type BgTilesetMemory = MemoryBlockManager<Tile4, Safe, Safe, 512>;
 
 static GBA_TAKEN: GbaCell<bool> = GbaCell::new(false);
 static PREV_INPUT_STATE: GbaCell<KeyInput> = GbaCell::new(KeyInput::new());
@@ -19,6 +20,7 @@ pub struct GBA {
     pub bg_palette_memory: PaletteMemory,
     pub obj_attr_memory: ObjAttrMemory,
     pub obj_tile_memory: ObjTileMemory,
+    // pub bg_tileset_memory: BgTilesetMemory,
 }
 
 pub enum GbaKey {
