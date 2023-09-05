@@ -34,6 +34,7 @@ pub fn find_backgrounds(directory: &Path) -> Result<Vec<Background>, BackgroundE
     // Find all .aseprite files in the directory
     let entries =
         read_dir(directory).map_err(|_e| BackgroundError("Failed to read background dir."))?;
+
     let mut backgrounds: Vec<Background> = Vec::new();
 
     for entry in entries {

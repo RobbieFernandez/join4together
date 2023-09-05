@@ -33,7 +33,7 @@ fn main() {
 
     // Generate background source code.
     let background_dir = Path::new(&"assets/backgrounds");
-    let background_source = get_background_source(&background_dir);
+    let background_source = get_background_source(background_dir);
     let background_output_file = output_dir.join(Path::new("background_data.rs"));
     write_source(&background_source, &background_output_file);
 }
@@ -43,7 +43,7 @@ fn get_sprite_source(sprite_dir: &Path) -> String {
         .with_root(Node::new(palette::Palette::new(vec![0])))
         .build();
 
-    let sprites = find_sprites(&sprite_dir).unwrap();
+    let sprites = find_sprites(sprite_dir).unwrap();
 
     for sprite in &sprites {
         add_palette(&mut palette_tree, sprite.palette.clone());
@@ -70,15 +70,13 @@ fn get_background_source(background_dir: &Path) -> String {
 
     let background_definitions: Vec<String> = backgrounds
         .iter()
-        .map(|b| backgrounds::codegen::generate_background_struct_src(b))
+        .map(backgrounds::codegen::generate_background_struct_src)
         .collect();
 
-    background_definitions.join("\n")
+    background_definitions.join("")
 }
 
 fn write_source(source_text: &str, output_path: &Path) {
-    // println!("cargo:warning={}", source_text);
-
     let syntax_tree: syn::File =
         syn::parse_str(source_text).expect("Error parsing generated code.");
 

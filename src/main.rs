@@ -60,6 +60,9 @@ extern "C" fn main() -> ! {
         match screen {
             Screen::Title(ref mut t) => {
                 if t.update() {
+                    // Drop the current screen first to release any memory allocations it's holding.
+                    drop(screen);
+
                     screen = Screen::Game(GameScreen::new(
                         &gba,
                         &red_token_animation,

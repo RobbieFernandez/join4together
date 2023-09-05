@@ -1,5 +1,6 @@
 use core::cmp::min;
 
+use crate::graphics::background::{LoadedBackground, BOARD_BACKGROUND};
 use crate::graphics::sprite::{
     AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite,
 };
@@ -54,6 +55,7 @@ pub struct GameScreen<'a> {
     game_state: GameState,
     game_board: game_board::GameBoard<'a>,
     cpu_face: cpu_face::CpuFace<'a>,
+    _background: LoadedBackground<'a>,
 }
 
 impl<'a> GameScreen<'a> {
@@ -90,6 +92,8 @@ impl<'a> GameScreen<'a> {
 
         let cpu_face = cpu_face::CpuFace::new(gba, cpu_head_xpos, cpu_head_ypos, cpu_sprites);
 
+        let _background = BOARD_BACKGROUND.load(gba);
+
         Self {
             gba,
             red_token_animation_controller,
@@ -98,6 +102,7 @@ impl<'a> GameScreen<'a> {
             game_state,
             game_board,
             cpu_face,
+            _background,
         }
     }
 

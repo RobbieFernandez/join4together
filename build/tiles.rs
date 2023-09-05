@@ -1,4 +1,4 @@
-use std::{cmp::max, ops::Deref};
+use std::ops::Deref;
 
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -101,6 +101,42 @@ impl ToTokens for TileVec {
     }
 }
 
+/// Calculate the smallest valid dimensions the sprite can fit in.
+///
+/// Valid sizes are:
+///
+/// | Size | Square | Horizontal | Vertical |
+/// |:-:|:-:|:-:|:-:|
+/// | 0 | 8x8 | 16x8 | 8x16 |
+/// | 1 | 16x16 | 32x8 | 8x32 |
+/// | 2 | 32x32 | 32x16 | 16x32 |
+/// | 3 | 64x64 | 64x32 | 32x64 |
+fn get_padded_sprite_dimensions(width: usize, height: usize) -> (usize, usize) {
+    // Surely there's a smarter way to do this. Oh well
+    let mut sizes = [
+        (8, 8),
+        (16, 8),
+        (8, 16),
+        (16, 16),
+        (32, 8),
+        (8, 32),
+        (32, 32),
+        (32, 16),
+        (16, 32),
+        (64, 64),
+        (64, 32),
+        (32, 64),
+    ];
+
+    sizes.sort_by_key(|s| s.0 * s.1);
+
+    *sizes
+        .iter()
+        .filter(|s| s.0 >= width && s.1 >= height)
+        .next()
+        .expect("Sprite image is too large.")
+}
+
 /// Convert from the original Sprite representation, to a 1-dimensional vector of Tiles.
 pub fn convert_sprite_to_tiles(
     sprite: &SpriteWithPalette,
@@ -117,9 +153,14 @@ pub fn convert_sprite_to_tiles(
             .map(|i| mapped_palette.map_index(*i))
             .collect();
 
-        // Sprites sizes must be powers of 2, and cannot be less than TILE_SIZE
-        let padded_width = max(sprite.width.next_power_of_two(), TILE_SIZE);
-        let padded_height = max(sprite.height.next_power_of_two(), TILE_SIZE);
+        // Sprites sizes must be powers of 2, and cannot be less than TILE_SIZE.
+
+        // Sprites can only be specific sizes. These are:
+        //     Square: 8x8   16x16   32x32   64x64
+        //     Horiz:  16x8  32x8    32x16   64x32
+        //     Vert:   8x16  8x32    16x32   32x64
+        let (padded_width, padded_height) =
+            get_padded_sprite_dimensions(sprite.width, sprite.height);
 
         let converted_image_data = grid::resize_grid(
             converted_image_data,
