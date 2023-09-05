@@ -1,26 +1,33 @@
 use super::memory::block::MemoryBlockManager;
 use super::memory::series::MemorySeriesManager;
+use super::memory::strided_grid::MemoryStridedGridManager;
 use gba::prelude::*;
 use voladdress::Safe;
 
 pub use super::memory::block::ClaimedVolRegion;
 pub use super::memory::series::ClaimedVolAddress;
+pub use super::memory::strided_grid::ClaimedGridFrames;
 
 pub type PaletteMemory = MemoryBlockManager<Color, Safe, Safe, 256>;
 pub type ObjAttrMemory = MemorySeriesManager<ObjAttr, Safe, Safe, 128, 8>;
 pub type ObjTileMemory = MemoryBlockManager<Tile4, Safe, Safe, 1024>;
-pub type BgTilesetMemory = MemoryBlockManager<Tile4, Safe, Safe, 512>;
+pub type CharblockMemory = MemoryBlockManager<Tile4, Safe, Safe, 512>;
+pub type ScreenblockMemory =
+    MemoryStridedGridManager<TextEntry, Safe, Safe, 32, 32, 32, SCREENBLOCK_INDEX_OFFSET>;
 
 static GBA_TAKEN: GbaCell<bool> = GbaCell::new(false);
 static PREV_INPUT_STATE: GbaCell<KeyInput> = GbaCell::new(KeyInput::new());
 static CURRENT_INPUT_STATE: GbaCell<KeyInput> = GbaCell::new(KeyInput::new());
+
+pub const CHARBLOCK_BASE: u16 = 3;
 
 pub struct GBA {
     pub obj_palette_memory: PaletteMemory,
     pub bg_palette_memory: PaletteMemory,
     pub obj_attr_memory: ObjAttrMemory,
     pub obj_tile_memory: ObjTileMemory,
-    // pub bg_tileset_memory: BgTilesetMemory,
+    pub charblock_memory: CharblockMemory,
+    pub screenblock_memory: ScreenblockMemory,
 }
 
 pub enum GbaKey {
@@ -58,6 +65,14 @@ impl GBA {
             obj_palette_memory: PaletteMemory::new(OBJ_PALETTE),
             obj_attr_memory: ObjAttrMemory::new(OBJ_ATTR_ALL),
             obj_tile_memory: ObjTileMemory::new(OBJ_TILES),
+
+            // Screenblocks and charblocks occupy the same region in memory, so we need to make sure we don't
+            // try to allocate overlapping addressed for Tilemaps/Tilesets.
+            // The memory managers assume that they own the memory they allocate, so this breaks that assumption.
+            // As a sort of hack, we will just use charblock 3, so that they won't overlap unless we allocate
+            // too many screenblocks (which we don't for this game).
+            charblock_memory: CharblockMemory::new(CHARBLOCK3_4BPP),
+            screenblock_memory: ScreenblockMemory::new(TEXT_SCREENBLOCKS),
         };
         gba.init();
         gba

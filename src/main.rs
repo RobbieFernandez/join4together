@@ -5,6 +5,7 @@ use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel};
 use graphics::sprite::{
     BOARD_SLOT_SPRITE, OBJ_PALETTE, RED_TOKEN_ANIMATION, YELLOW_TOKEN_ANIMATION,
 };
+
 use screens::game_screen::{cpu_face::CpuSprites, GameScreen};
 use system::gba::GBA;
 

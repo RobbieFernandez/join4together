@@ -4,3 +4,5 @@ pub const BOARD_SLOTS: usize = (BOARD_COLUMNS * BOARD_ROWS) as usize;
 
 pub const SCREEN_WIDTH: u16 = 240;
 pub const SCREEN_HEIGHT: u16 = 160;
+
+pub const CHARBLOCK_BASE: u16 = 3;

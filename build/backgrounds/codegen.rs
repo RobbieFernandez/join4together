@@ -11,7 +11,7 @@ pub fn generate_background_struct_src(background: &backgrounds::Background) -> S
     let size = get_size_enum(tilemap.width, tilemap.height);
 
     quote! {
-        static #ident: Background = Background {
+        pub static #ident: Background = Background {
             tileset: #tiles,
             tilemap: &#tilemap,
             palette: &#palette,

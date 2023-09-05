@@ -49,6 +49,10 @@ impl<
             .get_frame(index)
             .expect("VolGrid2D frame index out of bounds")
     }
+
+    pub fn get_start(&self) -> usize {
+        self.claimed_memory_range.start()
+    }
 }
 
 impl<
