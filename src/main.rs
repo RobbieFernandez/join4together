@@ -6,7 +6,10 @@ use graphics::sprite::{
     BOARD_SLOT_SPRITE, OBJ_PALETTE, RED_TOKEN_ANIMATION, YELLOW_TOKEN_ANIMATION,
 };
 
-use screens::game_screen::{cpu_face::CpuSprites, GameScreen};
+use screens::{
+    game_screen::{cpu_face::CpuSprites, GameScreen},
+    title_screen::TitleScreen,
+};
 use system::gba::GBA;
 
 pub mod graphics;
@@ -25,6 +28,7 @@ fn panic_handler(i: &core::panic::PanicInfo) -> ! {
 }
 
 enum Screen<'a> {
+    Title(TitleScreen<'a>),
     Game(GameScreen<'a>),
 }
 
@@ -48,19 +52,26 @@ extern "C" fn main() -> ! {
     let board_slot_sprite = BOARD_SLOT_SPRITE.load(&gba);
     let cpu_sprites = CpuSprites::new(&gba);
 
-    let mut screen = Screen::Game(GameScreen::new(
-        &gba,
-        &red_token_animation,
-        &yellow_token_animation,
-        &board_slot_sprite,
-        &cpu_sprites,
-    ));
+    let mut screen = Screen::Title(TitleScreen::new(&gba));
 
     loop {
         gba::bios::VBlankIntrWait();
 
         match screen {
-            Screen::Game(ref mut g) => g.update(),
+            Screen::Title(ref mut t) => {
+                if t.update() {
+                    screen = Screen::Game(GameScreen::new(
+                        &gba,
+                        &red_token_animation,
+                        &yellow_token_animation,
+                        &board_slot_sprite,
+                        &cpu_sprites,
+                    ));
+                }
+            }
+            Screen::Game(ref mut g) => {
+                g.update();
+            }
         };
     }
 }
