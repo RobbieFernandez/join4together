@@ -19,9 +19,11 @@ mod game_board;
 mod player_turn;
 mod turn;
 
-const TOKEN_DROP_TOP_SPEED: u16 = 15;
-const TOKEN_DROP_SPEED_GRADIENT: u16 = 1;
-const TOKEN_DROP_STARTING_SPEED: u16 = 1;
+const TOKEN_DROP_TOP_SPEED: i16 = 15;
+const TOKEN_DROP_SPEED_GRADIENT: i16 = 1;
+const TOKEN_DROP_STARTING_SPEED: i16 = 1;
+
+const TOKEN_BOUNCE_SPEED_DECAY: i16 = 2;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Player {
@@ -37,7 +39,8 @@ struct TokenDroppingState {
     target_y: u16,
     row: usize,
     obj_index: usize,
-    speed: u16,
+    speed: i16,
+    num_bounces: i16
 }
 
 #[derive(Clone)]
@@ -157,6 +160,7 @@ impl<'a> GameScreen<'a> {
                         current_y: y_pos,
                         speed: TOKEN_DROP_STARTING_SPEED,
                         target_y: self.game_board.get_token_ypos_for_row(row),
+                        num_bounces: 0
                     };
 
                     Some(GameState::TokenDropping(drop_state))
@@ -171,7 +175,12 @@ impl<'a> GameScreen<'a> {
     }
 
     fn update_token_dropping(&mut self, state: &mut TokenDroppingState) -> Option<GameState> {
-        state.current_y = min(state.current_y + state.speed, state.target_y);
+        let i_current_y : i16 = state.current_y.try_into().unwrap();
+        let new_y = i_current_y + state.speed;
+
+        state.current_y = new_y.try_into().unwrap();
+        state.current_y = min(state.current_y, state.target_y);
+
         state.speed = min(
             state.speed + TOKEN_DROP_SPEED_GRADIENT,
             TOKEN_DROP_TOP_SPEED,
@@ -180,28 +189,38 @@ impl<'a> GameScreen<'a> {
         self.update_token_dropping_obj(state);
 
         if state.current_y == state.target_y {
-            // Turn is over now.
-            // Check victory conditions, otherwise move to next player's turn.
-            if self
-                .game_board
-                .is_winning_token(state.column, state.row, state.player)
-            {
-                // TODO - Transition to game over screen.
-                if state.player == Player::Red {
-                    self.cpu_face.set_emotion(cpu_face::CpuEmotion::Sad);
-                }
+            let bounce_speed = -1 * (state.speed / TOKEN_BOUNCE_SPEED_DECAY);
 
-                panic!("Game's over");
+            if bounce_speed.abs() == 1 {
+                // Bouncing animation has
+                // Turn is over now.
+                // Check victory conditions, otherwise move to next player's turn.
+                if self
+                    .game_board
+                    .is_winning_token(state.column, state.row, state.player)
+                {
+                    // TODO - Transition to game over screen.
+                    if state.player == Player::Red {
+                        self.cpu_face.set_emotion(cpu_face::CpuEmotion::Sad);
+                    }
+    
+                    panic!("Game's over");
+                } else {
+                    // TODO - Don't hardcode CPU/Player.
+                    match state.player {
+                        Player::Red => Some(GameState::CpuTurnState(CpuTurn::new(
+                            state.player.opposite(),
+                        ))),
+                        Player::Yellow => Some(GameState::PlayerTurnState(PlayerTurn::new(
+                            state.player.opposite(),
+                        ))),
+                    }
+                } 
             } else {
-                // TODO - Don't hardcode CPU/Player.
-                match state.player {
-                    Player::Red => Some(GameState::CpuTurnState(CpuTurn::new(
-                        state.player.opposite(),
-                    ))),
-                    Player::Yellow => Some(GameState::PlayerTurnState(PlayerTurn::new(
-                        state.player.opposite(),
-                    ))),
-                }
+                state.num_bounces += 1;
+                state.speed = bounce_speed;
+
+                None
             }
         } else {
             None
