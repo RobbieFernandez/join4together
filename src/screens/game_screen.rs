@@ -10,8 +10,6 @@ use cpu_turn::CpuTurn;
 use player_turn::PlayerTurn;
 use turn::Turn;
 
-use self::cpu_face::CpuSprites;
-
 pub mod cpu_face;
 mod cpu_turn;
 mod cursor;
@@ -40,7 +38,7 @@ struct TokenDroppingState {
     row: usize,
     obj_index: usize,
     speed: i16,
-    num_bounces: i16
+    num_bounces: i16,
 }
 
 #[derive(Clone)]
@@ -67,7 +65,6 @@ impl<'a> GameScreen<'a> {
         red_token_animation: &'a LoadedAnimation<4>,
         yellow_token_animation: &'a LoadedAnimation<4>,
         board_slot_sprite: &'a LoadedSprite<'a>,
-        cpu_sprites: &'a CpuSprites<'a>,
     ) -> Self {
         let red_token_animation_controller = red_token_animation.create_controller(gba);
         let yellow_token_animation_controller = yellow_token_animation.create_controller(gba);
@@ -85,15 +82,13 @@ impl<'a> GameScreen<'a> {
             yellow_token_animation.get_frame(0),
         );
 
-        let cpu_head_sprite = cpu_sprites.get_head_sprite().sprite();
-
-        let cpu_head_height: u16 = cpu_head_sprite.height().try_into().unwrap();
-        let cpu_head_width: u16 = cpu_head_sprite.width().try_into().unwrap();
+        let cpu_head_height: u16 = cpu_face::CpuSprites::height().try_into().unwrap();
+        let cpu_head_width: u16 = cpu_face::CpuSprites::width().try_into().unwrap();
 
         let cpu_head_ypos = SCREEN_HEIGHT - cpu_head_height;
         let cpu_head_xpos = SCREEN_WIDTH - cpu_head_width - 5;
 
-        let cpu_face = cpu_face::CpuFace::new(gba, cpu_head_xpos, cpu_head_ypos, cpu_sprites);
+        let cpu_face = cpu_face::CpuFace::new(gba, cpu_head_xpos, cpu_head_ypos);
 
         let _background = BOARD_BACKGROUND.load(gba);
 
@@ -160,7 +155,7 @@ impl<'a> GameScreen<'a> {
                         current_y: y_pos,
                         speed: TOKEN_DROP_STARTING_SPEED,
                         target_y: self.game_board.get_token_ypos_for_row(row),
-                        num_bounces: 0
+                        num_bounces: 0,
                     };
 
                     Some(GameState::TokenDropping(drop_state))
@@ -175,7 +170,7 @@ impl<'a> GameScreen<'a> {
     }
 
     fn update_token_dropping(&mut self, state: &mut TokenDroppingState) -> Option<GameState> {
-        let i_current_y : i16 = state.current_y.try_into().unwrap();
+        let i_current_y: i16 = state.current_y.try_into().unwrap();
         let new_y = i_current_y + state.speed;
 
         state.current_y = new_y.try_into().unwrap();
@@ -203,7 +198,7 @@ impl<'a> GameScreen<'a> {
                     if state.player == Player::Red {
                         self.cpu_face.set_emotion(cpu_face::CpuEmotion::Sad);
                     }
-    
+
                     panic!("Game's over");
                 } else {
                     // TODO - Don't hardcode CPU/Player.
@@ -215,7 +210,7 @@ impl<'a> GameScreen<'a> {
                             state.player.opposite(),
                         ))),
                     }
-                } 
+                }
             } else {
                 state.num_bounces += 1;
                 state.speed = bounce_speed;

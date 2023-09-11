@@ -19,7 +19,7 @@ pub struct CpuFace<'a> {
     _gba: &'a GBA,
     _cpu_head_obj: LoadedObjectEntry<'a>,
     cpu_face_obj: LoadedObjectEntry<'a>,
-    cpu_sprites: &'a CpuSprites<'a>,
+    cpu_sprites: CpuSprites<'a>,
 }
 
 #[derive(Clone, Copy)]
@@ -32,7 +32,7 @@ pub enum CpuEmotion {
 }
 
 impl<'a> CpuSprites<'a> {
-    pub fn new(gba: &'a GBA) -> Self {
+    fn new(gba: &'a GBA) -> Self {
         let cpu_head_sprite = CPU_HEAD_SPRITE.load(gba);
         let cpu_neutral_face_sprite = CPU_FACE_NEUTRAL_SPRITE.load(gba);
         let cpu_happy_face_sprite = CPU_FACE_HAPPY_SPRITE.load(gba);
@@ -51,11 +51,11 @@ impl<'a> CpuSprites<'a> {
         }
     }
 
-    pub fn get_head_sprite(&'a self) -> &'a LoadedSprite<'a> {
+    fn get_head_sprite(&'a self) -> &'a LoadedSprite<'a> {
         &self.cpu_head_sprite
     }
 
-    pub fn get_face_sprite(&'a self, emotion: CpuEmotion) -> &'a LoadedSprite<'a> {
+    fn get_face_sprite(&'a self, emotion: CpuEmotion) -> &'a LoadedSprite<'a> {
         match emotion {
             CpuEmotion::Neutral => &self.cpu_neutral_face_sprite,
             CpuEmotion::Happy => &self.cpu_happy_face_sprite,
@@ -64,10 +64,19 @@ impl<'a> CpuSprites<'a> {
             CpuEmotion::Sad => &self.cpu_sad_face_sprite,
         }
     }
+
+    pub fn height() -> usize {
+        CPU_HEAD_SPRITE.height()
+    }
+
+    pub fn width() -> usize {
+        CPU_HEAD_SPRITE.width()
+    }
 }
 
 impl<'a> CpuFace<'a> {
-    pub fn new(gba: &'a GBA, x_pos: u16, y_pos: u16, cpu_sprites: &'a CpuSprites<'a>) -> Self {
+    pub fn new(gba: &'a GBA, x_pos: u16, y_pos: u16) -> Self {
+        let cpu_sprites = CpuSprites::new(gba);
         let mut cpu_head_obj = cpu_sprites.get_head_sprite().create_obj_attr_entry(gba);
 
         let mut cpu_face_obj = cpu_sprites
