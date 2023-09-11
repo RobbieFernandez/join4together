@@ -77,7 +77,7 @@ impl<'a> LoadedSprite<'a> {
         self.sprite
     }
 
-    pub fn create_obj_attr_entry<'b>(&self, gba: &'b GBA) -> LoadedObjectEntry<'b> {
+    pub fn create_obj_attr_entry(&'a self, gba: &'a GBA) -> LoadedObjectEntry<'a> {
         let slot = gba.obj_attr_memory.request_slot().expect("Out of OBJRAM");
         let oa = ObjAttr::new();
         let mut entry = LoadedObjectEntry { slot, obj_attr: oa };

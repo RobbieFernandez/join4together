@@ -2,13 +2,18 @@ use core::cmp::min;
 
 use crate::graphics::background::{LoadedBackground, BOARD_BACKGROUND};
 use crate::graphics::sprite::{
-    AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite,
+    AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite, BOARD_SLOT_SPRITE,
+    RED_TOKEN_ANIMATION, YELLOW_TOKEN_ANIMATION,
 };
 use crate::system::constants::SCREEN_WIDTH;
 use crate::system::{constants::BOARD_SLOTS, constants::SCREEN_HEIGHT, gba::GBA};
 use cpu_turn::CpuTurn;
 use player_turn::PlayerTurn;
 use turn::Turn;
+
+use self::cpu_face::CpuSprites;
+
+use super::ScreenState;
 
 pub mod cpu_face;
 mod cpu_turn;
@@ -65,6 +70,7 @@ impl<'a> GameScreen<'a> {
         red_token_animation: &'a LoadedAnimation<4>,
         yellow_token_animation: &'a LoadedAnimation<4>,
         board_slot_sprite: &'a LoadedSprite<'a>,
+        cpu_sprites: &'a CpuSprites<'a>,
     ) -> Self {
         let red_token_animation_controller = red_token_animation.create_controller(gba);
         let yellow_token_animation_controller = yellow_token_animation.create_controller(gba);
@@ -88,7 +94,7 @@ impl<'a> GameScreen<'a> {
         let cpu_head_ypos = SCREEN_HEIGHT - cpu_head_height;
         let cpu_head_xpos = SCREEN_WIDTH - cpu_head_width - 5;
 
-        let cpu_face = cpu_face::CpuFace::new(gba, cpu_head_xpos, cpu_head_ypos);
+        let cpu_face = cpu_face::CpuFace::new(gba, cpu_head_xpos, cpu_head_ypos, cpu_sprites);
 
         let _background = BOARD_BACKGROUND.load(gba);
 
@@ -262,5 +268,25 @@ impl Player {
             Player::Red => Player::Yellow,
             Player::Yellow => Player::Red,
         }
+    }
+}
+
+pub fn game_loop(gba: &GBA) -> ScreenState {
+    let yellow_token_animation = YELLOW_TOKEN_ANIMATION.load(gba);
+    let red_token_animation = RED_TOKEN_ANIMATION.load(gba);
+    let board_slot_sprite = BOARD_SLOT_SPRITE.load(gba);
+    let cpu_sprites = CpuSprites::new(gba);
+
+    let mut screen = GameScreen::new(
+        gba,
+        &red_token_animation,
+        &yellow_token_animation,
+        &board_slot_sprite,
+        &cpu_sprites,
+    );
+
+    loop {
+        gba::bios::VBlankIntrWait();
+        screen.update();
     }
 }

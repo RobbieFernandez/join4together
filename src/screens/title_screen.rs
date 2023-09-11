@@ -8,6 +8,8 @@ use crate::{
     system::gba::{GbaKey, GBA},
 };
 
+use super::ScreenState;
+
 const PRESS_START_Y: u16 = 140;
 
 const BLINK_TIME_ON: u32 = 40;
@@ -20,18 +22,19 @@ enum BlinkState {
 
 pub struct TitleScreen<'a> {
     gba: &'a GBA,
-    _press_text_sprite: LoadedSprite<'a>,
     press_text_object: LoadedObjectEntry<'a>,
-    _start_text_sprite: LoadedSprite<'a>,
     start_text_object: LoadedObjectEntry<'a>,
     _background: LoadedBackground<'a>,
     blink_state: BlinkState,
 }
 
 impl<'a> TitleScreen<'a> {
-    pub fn new(gba: &'a GBA) -> Self {
+    pub fn new(
+        gba: &'a GBA,
+        press_text_sprite: &'a LoadedSprite<'a>,
+        start_text_sprite: &'a LoadedSprite<'a>,
+    ) -> Self {
         let background = TITLE_SCREEN_BACKGROUND.load(gba);
-        let press_text_sprite = PRESS_TEXT_SPRITE.load(gba);
         let mut press_text_object = press_text_sprite.create_obj_attr_entry(gba);
 
         let press_oa = press_text_object.get_obj_attr_data();
@@ -39,7 +42,6 @@ impl<'a> TitleScreen<'a> {
         press_oa.1 = press_oa.1.with_x(85);
         press_text_object.commit_to_memory();
 
-        let start_text_sprite = START_TEXT_SPRITE.load(gba);
         let mut start_text_object = start_text_sprite.create_obj_attr_entry(gba);
 
         let start_oa = start_text_object.get_obj_attr_data();
@@ -52,8 +54,6 @@ impl<'a> TitleScreen<'a> {
             press_text_object,
             start_text_object,
             blink_state: BlinkState::On(0),
-            _press_text_sprite: press_text_sprite,
-            _start_text_sprite: start_text_sprite,
             _background: background,
         }
     }
@@ -97,6 +97,20 @@ impl<'a> TitleScreen<'a> {
             let oa = obj.get_obj_attr_data();
             oa.0 = oa.0.with_style(ObjDisplayStyle::Normal);
             obj.commit_to_memory();
+        }
+    }
+}
+
+pub fn game_loop(gba: &GBA) -> ScreenState {
+    let press_text_sprite = PRESS_TEXT_SPRITE.load(gba);
+    let start_text_sprite = START_TEXT_SPRITE.load(gba);
+
+    let mut screen = TitleScreen::new(gba, &press_text_sprite, &start_text_sprite);
+
+    loop {
+        gba::bios::VBlankIntrWait();
+        if screen.update() {
+            return ScreenState::GameScreen;
         }
     }
 }
