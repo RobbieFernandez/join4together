@@ -132,8 +132,7 @@ fn get_padded_sprite_dimensions(width: usize, height: usize) -> (usize, usize) {
 
     *sizes
         .iter()
-        .filter(|s| s.0 >= width && s.1 >= height)
-        .next()
+        .find(|s| s.0 >= width && s.1 >= height)
         .expect("Sprite image is too large.")
 }
 

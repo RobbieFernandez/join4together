@@ -24,6 +24,7 @@ fn panic_handler(i: &core::panic::PanicInfo) -> ! {
     loop {}
 }
 
+#[allow(clippy::large_enum_variant)]
 enum Screen<'a> {
     Title(TitleScreen<'a>),
     Game(GameScreen<'a>),

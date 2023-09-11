@@ -87,7 +87,7 @@ impl<'a> LoadedSprite<'a> {
         entry
     }
 
-    pub fn store_in_obj_entry<'b>(&self, obj_entry: &mut LoadedObjectEntry<'b>) {
+    pub fn store_in_obj_entry(&self, obj_entry: &mut LoadedObjectEntry) {
         let oa = obj_entry.get_obj_attr_data();
 
         oa.0 = oa.0.with_bpp8(false).with_shape(self.sprite.shape);

@@ -184,7 +184,7 @@ impl<'a> GameScreen<'a> {
         self.update_token_dropping_obj(state);
 
         if state.current_y == state.target_y {
-            let bounce_speed = -1 * (state.speed / TOKEN_BOUNCE_SPEED_DECAY);
+            let bounce_speed = -(state.speed / TOKEN_BOUNCE_SPEED_DECAY);
 
             if bounce_speed.abs() == 1 {
                 // Bouncing animation has

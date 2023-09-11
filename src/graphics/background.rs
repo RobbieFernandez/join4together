@@ -85,7 +85,6 @@ impl Background {
 
 impl<'a> LoadedBackground<'a> {
     fn new(background: &'a Background, gba: &'a GBA) -> Self {
-        // Not sure if this needs a specific alignment. For now assume it doesn't
         let charblock_region = gba
             .charblock_memory
             .request_memory(background.tileset.len())
@@ -112,7 +111,7 @@ impl<'a> LoadedBackground<'a> {
         }
 
         let mut loaded_bg = LoadedBackground {
-            background: background,
+            background,
             charblock_memory: charblock_region,
             screenblock_memory: screenblocks,
             palette_bank: pal_bank_number,
