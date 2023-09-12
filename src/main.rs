@@ -40,7 +40,8 @@ extern "C" fn main() -> ! {
 
     let mut screen_state = ScreenState::TitleScreen;
 
+    // Top-level game loop just runs the currently active screen until it transitions.
     loop {
-        screen_state = screen_state.game_loop(&gba);
+        screen_state = screen_state.exec_screen(&gba);
     }
 }

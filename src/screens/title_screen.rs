@@ -3,12 +3,12 @@ use gba::prelude::ObjDisplayStyle;
 use crate::{
     graphics::{
         background::{LoadedBackground, TITLE_SCREEN_BACKGROUND},
-        sprite::{LoadedObjectEntry, LoadedSprite, PRESS_TEXT_SPRITE, START_TEXT_SPRITE},
+        sprite::{LoadedObjectEntry, LoadedSprite},
     },
     system::gba::{GbaKey, GBA},
 };
 
-use super::ScreenState;
+use super::{Screen, ScreenState};
 
 const PRESS_START_Y: u16 = 140;
 
@@ -58,11 +58,6 @@ impl<'a> TitleScreen<'a> {
         }
     }
 
-    pub fn update(&mut self) -> bool {
-        self.update_blinking_text();
-        self.gba.key_was_pressed(GbaKey::START)
-    }
-
     pub fn update_blinking_text(&mut self) {
         self.blink_state = match self.blink_state {
             BlinkState::On(t) => {
@@ -101,16 +96,13 @@ impl<'a> TitleScreen<'a> {
     }
 }
 
-pub fn game_loop(gba: &GBA) -> ScreenState {
-    let press_text_sprite = PRESS_TEXT_SPRITE.load(gba);
-    let start_text_sprite = START_TEXT_SPRITE.load(gba);
-
-    let mut screen = TitleScreen::new(gba, &press_text_sprite, &start_text_sprite);
-
-    loop {
-        gba::bios::VBlankIntrWait();
-        if screen.update() {
-            return ScreenState::GameScreen;
+impl<'a> Screen for TitleScreen<'a> {
+    fn update(&mut self) -> Option<ScreenState> {
+        self.update_blinking_text();
+        if self.gba.key_was_pressed(GbaKey::START) {
+            Some(ScreenState::GameScreen)
+        } else {
+            None
         }
     }
 }

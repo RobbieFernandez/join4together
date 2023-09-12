@@ -2,8 +2,7 @@ use core::cmp::min;
 
 use crate::graphics::background::{LoadedBackground, BOARD_BACKGROUND};
 use crate::graphics::sprite::{
-    AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite, BOARD_SLOT_SPRITE,
-    RED_TOKEN_ANIMATION, YELLOW_TOKEN_ANIMATION,
+    AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite,
 };
 use crate::system::constants::SCREEN_WIDTH;
 use crate::system::{constants::BOARD_SLOTS, constants::SCREEN_HEIGHT, gba::GBA};
@@ -13,7 +12,7 @@ use turn::Turn;
 
 use self::cpu_face::CpuSprites;
 
-use super::ScreenState;
+use super::{Screen, ScreenState};
 
 pub mod cpu_face;
 mod cpu_turn;
@@ -107,24 +106,6 @@ impl<'a> GameScreen<'a> {
             game_board,
             cpu_face,
             _background,
-        }
-    }
-
-    pub fn update(&mut self) {
-        let mut state = self.get_state();
-
-        let new_state = match state {
-            GameState::PlayerTurnState(ref mut player_turn) => self.update_turn(player_turn),
-            GameState::CpuTurnState(ref mut cpu_turn) => self.update_turn(cpu_turn),
-            GameState::TokenDropping(ref mut token_state) => {
-                self.update_token_dropping(token_state)
-            }
-        };
-
-        if let Some(new_state) = new_state {
-            self.game_state = new_state;
-        } else {
-            self.game_state = state;
         }
     }
 
@@ -271,22 +252,24 @@ impl Player {
     }
 }
 
-pub fn game_loop(gba: &GBA) -> ScreenState {
-    let yellow_token_animation = YELLOW_TOKEN_ANIMATION.load(gba);
-    let red_token_animation = RED_TOKEN_ANIMATION.load(gba);
-    let board_slot_sprite = BOARD_SLOT_SPRITE.load(gba);
-    let cpu_sprites = CpuSprites::new(gba);
+impl<'a> Screen for GameScreen<'a> {
+    fn update(&mut self) -> Option<ScreenState> {
+        let mut state = self.get_state();
 
-    let mut screen = GameScreen::new(
-        gba,
-        &red_token_animation,
-        &yellow_token_animation,
-        &board_slot_sprite,
-        &cpu_sprites,
-    );
+        let new_state = match state {
+            GameState::PlayerTurnState(ref mut player_turn) => self.update_turn(player_turn),
+            GameState::CpuTurnState(ref mut cpu_turn) => self.update_turn(cpu_turn),
+            GameState::TokenDropping(ref mut token_state) => {
+                self.update_token_dropping(token_state)
+            }
+        };
 
-    loop {
-        gba::bios::VBlankIntrWait();
-        screen.update();
+        if let Some(new_state) = new_state {
+            self.game_state = new_state;
+        } else {
+            self.game_state = state;
+        }
+
+        None
     }
 }
