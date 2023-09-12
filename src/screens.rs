@@ -36,6 +36,7 @@ impl ScreenState {
                 let vs_player_text_sprite = VS_PLAYER_TEXT_SPRITE.load(gba);
                 let vs_cpu_text_sprite = VS_CPU_TEXT_SPRITE.load(gba);
                 let cursor_animation = MENU_CURSOR_ANIMATION.load(gba);
+                let cpu_sprites = CpuSprites::new(gba);
 
                 let mut screen = title_screen::TitleScreen::new(
                     gba,
@@ -44,6 +45,7 @@ impl ScreenState {
                     &vs_cpu_text_sprite,
                     &vs_player_text_sprite,
                     &cursor_animation,
+                    &cpu_sprites,
                 );
 
                 self.screen_loop(&mut screen)

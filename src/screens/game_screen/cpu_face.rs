@@ -18,7 +18,7 @@ pub struct CpuSprites<'a> {
 
 pub struct CpuFace<'a> {
     _gba: &'a GBA,
-    _cpu_head_obj: LoadedObjectEntry<'a>,
+    cpu_head_obj: LoadedObjectEntry<'a>,
     cpu_face_obj: LoadedObjectEntry<'a>,
     cpu_sprites: &'a CpuSprites<'a>,
 }
@@ -99,7 +99,7 @@ impl<'a> CpuFace<'a> {
         Self {
             cpu_face_obj,
             cpu_sprites,
-            _cpu_head_obj: cpu_head_obj,
+            cpu_head_obj,
             _gba: gba,
         }
     }
@@ -108,5 +108,21 @@ impl<'a> CpuFace<'a> {
         let face_sprite = self.cpu_sprites.get_face_sprite(emotion);
         face_sprite.store_in_obj_entry(&mut self.cpu_face_obj);
         self.cpu_face_obj.commit_to_memory();
+    }
+
+    pub fn set_x(&mut self, x: u16) {
+        for obj in [&mut self.cpu_face_obj, &mut self.cpu_head_obj] {
+            let oa = obj.get_obj_attr_data();
+            oa.set_x(x);
+            obj.commit_to_memory();
+        }
+    }
+
+    pub fn set_y(&mut self, x: u16) {
+        for obj in [&mut self.cpu_face_obj, &mut self.cpu_head_obj] {
+            let oa = obj.get_obj_attr_data();
+            oa.set_y(x);
+            obj.commit_to_memory();
+        }
     }
 }

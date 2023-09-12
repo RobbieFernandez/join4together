@@ -11,7 +11,10 @@ use crate::{
     },
 };
 
-use super::{Screen, ScreenState};
+use super::{
+    game_screen::cpu_face::{CpuEmotion, CpuFace, CpuSprites},
+    Screen, ScreenState,
+};
 
 const MENU_TEXT_Y: u16 = 140;
 const MENU_TEXT_HORIZ_MARGIN: u16 = 8;
@@ -19,6 +22,9 @@ const CURSOR_X_OFFSET: u16 = 10;
 
 const BLINK_TIME_ON: u32 = 40;
 const BLINK_TIME_OFF: u32 = 20;
+
+const CPU_HEAD_POS: (u16, u16) = (133, 50);
+const GAME_TRANSITION_TIME: u16 = 40;
 
 #[derive(Clone)]
 enum BlinkState {
@@ -43,9 +49,16 @@ struct MenuState {
 }
 
 #[derive(Clone)]
+struct TransitionState {
+    game_mode: MenuEntry,
+    timer: u16,
+}
+
+#[derive(Clone)]
 enum TitleScreenState {
     PressStart(PressStartState),
     Menu(MenuState),
+    GameTransition(TransitionState),
 }
 
 pub struct TitleScreen<'a> {
@@ -57,6 +70,7 @@ pub struct TitleScreen<'a> {
     cursor_animation_controller: AnimationController<'a, 5>,
     _background: LoadedBackground<'a>,
     state: TitleScreenState,
+    cpu_face: CpuFace<'a>,
 }
 
 impl MenuEntry {
@@ -76,6 +90,7 @@ impl<'a> TitleScreen<'a> {
         vs_cpu_text_sprite: &'a LoadedSprite<'a>,
         vs_player_text_sprite: &'a LoadedSprite<'a>,
         cursor_animation: &'a LoadedAnimation<'a, 5>,
+        cpu_sprites: &'a CpuSprites<'a>,
     ) -> Self {
         let background = TITLE_SCREEN_BACKGROUND.load(gba);
         let mut press_text_object = press_text_sprite.create_obj_attr_entry(gba);
@@ -128,6 +143,10 @@ impl<'a> TitleScreen<'a> {
             blink_state: BlinkState::On(0),
         });
 
+        let mut cpu_face = CpuFace::new(gba, cpu_sprites);
+        cpu_face.set_x(CPU_HEAD_POS.0);
+        cpu_face.set_y(CPU_HEAD_POS.1);
+
         Self {
             gba,
             press_text_object,
@@ -136,11 +155,12 @@ impl<'a> TitleScreen<'a> {
             vs_cpu_text_object,
             vs_player_text_object,
             cursor_animation_controller,
+            cpu_face,
             _background: background,
         }
     }
 
-    fn update_press_start(&mut self, press_start_state: &mut PressStartState) {
+    fn update_press_start(&mut self, mut press_start_state: PressStartState) {
         press_start_state.blink_state = match press_start_state.blink_state {
             BlinkState::On(t) => {
                 if t >= BLINK_TIME_ON {
@@ -160,33 +180,38 @@ impl<'a> TitleScreen<'a> {
             }
         };
 
-        // Pretty gross, but we have to clone the state and set it again on self.
-        // That's because the state was already cloned before being passed to this function,
-        // so any mutations we make to it will not be persistent.
-        // TODO - Make this nicer :)
-        self.state = TitleScreenState::PressStart(press_start_state.clone());
+        self.state = TitleScreenState::PressStart(press_start_state);
 
         if self.gba.key_was_pressed(GbaKey::START) {
             self.enter_menu();
         }
     }
 
-    fn update_menu(&mut self, menu_state: &mut MenuState) -> Option<ScreenState> {
+    fn update_menu(&mut self, mut menu_state: MenuState) {
         if self.gba.key_was_pressed(GbaKey::LEFT) || self.gba.key_was_pressed(GbaKey::RIGHT) {
             menu_state.cursor_position = menu_state.cursor_position.next();
         };
 
-        self.update_cursor_object(menu_state);
-
-        // TODO: Same gross cloning behaviour as in update_press_start
-        self.state = TitleScreenState::Menu(menu_state.clone());
+        self.update_cursor_object(&menu_state);
+        self.update_cpu_expression(&menu_state);
 
         if self.gba.key_was_pressed(GbaKey::START) || self.gba.key_was_pressed(GbaKey::A) {
-            match menu_state.cursor_position {
+            self.enter_transition(menu_state.cursor_position);
+        } else {
+            self.state = TitleScreenState::Menu(menu_state);
+        }
+    }
+
+    fn update_transition(&mut self, mut transition_state: TransitionState) -> Option<ScreenState> {
+        transition_state.timer -= 1;
+
+        if transition_state.timer == 0 {
+            match transition_state.game_mode {
                 MenuEntry::VsCpu => Some(ScreenState::VsCpuScreen),
                 MenuEntry::VsPlayer => Some(ScreenState::VsPlayerScreen),
             }
         } else {
+            self.state = TitleScreenState::GameTransition(transition_state);
             None
         }
     }
@@ -214,6 +239,28 @@ impl<'a> TitleScreen<'a> {
         self.state = TitleScreenState::Menu(menu_state)
     }
 
+    fn enter_transition(&mut self, game_mode: MenuEntry) {
+        // Hide cursor.
+        let cursor_obj = self.cursor_animation_controller.get_obj_attr_entry();
+        let cursor_oa = cursor_obj.get_obj_attr_data();
+        cursor_oa.set_style(ObjDisplayStyle::NotDisplayed);
+        self.cursor_animation_controller.tick();
+
+        // Set CPU emotion.
+        let cpu_emotion = match game_mode {
+            MenuEntry::VsCpu => CpuEmotion::Surprised,
+            MenuEntry::VsPlayer => CpuEmotion::Sad,
+        };
+
+        self.cpu_face.set_emotion(cpu_emotion);
+
+        let transition_state = TransitionState {
+            game_mode,
+            timer: GAME_TRANSITION_TIME,
+        };
+        self.state = TitleScreenState::GameTransition(transition_state);
+    }
+
     fn update_cursor_object(&mut self, menu_state: &MenuState) {
         let target_obj = match menu_state.cursor_position {
             MenuEntry::VsCpu => self.vs_cpu_text_object.get_obj_attr_data(),
@@ -226,6 +273,15 @@ impl<'a> TitleScreen<'a> {
         let cursor_oa = cursor_obj.get_obj_attr_data();
         cursor_oa.set_x(cursor_x);
         self.cursor_animation_controller.tick();
+    }
+
+    fn update_cpu_expression(&mut self, menu_state: &MenuState) {
+        let cpu_emotion = match menu_state.cursor_position {
+            MenuEntry::VsCpu => CpuEmotion::Happy,
+            MenuEntry::VsPlayer => CpuEmotion::Mad,
+        };
+
+        self.cpu_face.set_emotion(cpu_emotion);
     }
 
     fn hide_press_start_text(&mut self) {
@@ -252,11 +308,15 @@ impl<'a> TitleScreen<'a> {
 impl<'a> Screen for TitleScreen<'a> {
     fn update(&mut self) -> Option<ScreenState> {
         match self.get_state() {
-            TitleScreenState::PressStart(ref mut state) => {
+            TitleScreenState::PressStart(state) => {
                 self.update_press_start(state);
                 None
             }
-            TitleScreenState::Menu(ref mut state) => self.update_menu(state),
+            TitleScreenState::Menu(state) => {
+                self.update_menu(state);
+                None
+            }
+            TitleScreenState::GameTransition(state) => self.update_transition(state),
         }
     }
 }
