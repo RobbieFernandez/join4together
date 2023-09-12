@@ -24,8 +24,8 @@ const TOKEN_DROP_STARTING_SPEED: i16 = 1;
 const TOKEN_BOUNCE_SPEED_DECAY: i16 = 2;
 
 pub enum Agent<'a> {
-    Human(TokenColor, PlayerTurn),
-    Cpu(TokenColor, CpuFace<'a>, CpuTurn),
+    Human(PlayerTurn),
+    Cpu(CpuFace<'a>, CpuTurn),
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -66,41 +66,35 @@ pub struct GameScreen<'a> {
 
 // The agent enum just proxies the update call to the appropriate Turn struct.
 impl<'a> Agent<'a> {
-    pub fn get_color(&self) -> TokenColor {
-        match self {
-            Self::Cpu(token_color, _, _) => token_color.clone(),
-            Self::Human(token_color, _) => token_color.clone(),
-        }
-    }
-
     pub fn update(
         &mut self,
         gba: &GBA,
+        token_color: TokenColor,
         animation_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
         opponent: &mut Agent,
     ) -> Option<usize> {
         match self {
-            Self::Cpu(_, ref mut face, ref mut turn) => {
-                turn.update(animation_controller, game_board, face)
+            Self::Cpu(ref mut face, ref mut turn) => {
+                turn.update(token_color, animation_controller, game_board, face)
             }
-            Self::Human(_, ref mut turn) => {
+            Self::Human(ref mut turn) => {
                 let cpu_face = match opponent {
-                    Agent::Human(_, _) => None,
-                    Agent::Cpu(_, ref mut face, _) => Some(face),
+                    Agent::Human(_) => None,
+                    Agent::Cpu(ref mut face, _) => Some(face),
                 };
 
-                turn.update(gba, animation_controller, game_board, cpu_face)
+                turn.update(gba, token_color, animation_controller, game_board, cpu_face)
             }
         }
     }
 
-    pub fn new_human_agent(color: TokenColor) -> Self {
-        Self::Human(color, PlayerTurn::new(color))
+    pub fn new_human_agent() -> Self {
+        Self::Human(PlayerTurn::new())
     }
 
-    pub fn new_cpu_agent(color: TokenColor, cpu_face: CpuFace<'a>) -> Self {
-        Self::Cpu(color, cpu_face, CpuTurn::new(color))
+    pub fn new_cpu_agent(cpu_face: CpuFace<'a>) -> Self {
+        Self::Cpu(cpu_face, CpuTurn::new())
     }
 }
 
@@ -164,6 +158,7 @@ impl<'a> GameScreen<'a> {
 
         let column = agent.update(
             self.gba,
+            token_color,
             animation_controller,
             &mut self.game_board,
             opponent,

@@ -8,10 +8,7 @@ use crate::{
     system::gba::GBA,
 };
 
-use self::game_screen::{
-    cpu_face::{CpuFace, CpuSprites},
-    TokenColor,
-};
+use self::game_screen::cpu_face::{CpuFace, CpuSprites};
 
 pub mod game_screen;
 pub mod title_screen;
@@ -45,14 +42,14 @@ impl ScreenState {
                 let cpu_sprites = CpuSprites::new(gba);
                 let cpu_face = CpuFace::new(gba, &cpu_sprites);
 
-                let red_agent = game_screen::Agent::new_human_agent(TokenColor::Red);
-                let yellow_agent = game_screen::Agent::new_cpu_agent(TokenColor::Yellow, cpu_face);
+                let red_agent = game_screen::Agent::new_human_agent();
+                let yellow_agent = game_screen::Agent::new_cpu_agent(cpu_face);
 
                 self.exec_game_screen(gba, red_agent, yellow_agent)
             }
             ScreenState::VsPlayerScreen => {
-                let red_agent = game_screen::Agent::new_human_agent(TokenColor::Red);
-                let yellow_agent = game_screen::Agent::new_human_agent(TokenColor::Red);
+                let red_agent = game_screen::Agent::new_human_agent();
+                let yellow_agent = game_screen::Agent::new_human_agent();
 
                 self.exec_game_screen(gba, red_agent, yellow_agent)
             }

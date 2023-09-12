@@ -31,17 +31,15 @@ enum CpuState {
 
 #[derive(Clone)]
 pub struct CpuTurn {
-    token_color: TokenColor,
     state: CpuState,
     cursor: Cursor,
 }
 
 impl CpuTurn {
-    pub fn new(token_color: TokenColor) -> Self {
+    pub fn new() -> Self {
         let deciding_state = DecidingState::new();
 
         Self {
-            token_color,
             state: CpuState::Deciding(deciding_state),
             cursor: Cursor::new(),
         }
@@ -49,12 +47,11 @@ impl CpuTurn {
 
     pub fn update(
         &mut self,
+        token_color: TokenColor,
         animation_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
         cpu_face: &mut CpuFace,
     ) -> Option<usize> {
-        let token_color = self.get_token_color();
-
         match self.state {
             CpuState::Deciding(ref mut deciding) => {
                 let best_column = deciding.get_best_column();
@@ -74,7 +71,7 @@ impl CpuTurn {
                     let row = game_board.get_next_free_row(column);
 
                     if let Some(row) = row {
-                        if !game_board.is_winning_token(column, row, self.token_color) {
+                        if !game_board.is_winning_token(column, row, token_color) {
                             cpu_face.set_emotion(CpuEmotion::Neutral);
                         }
 
@@ -94,10 +91,6 @@ impl CpuTurn {
         self.cursor.draw(animation_controller);
 
         None
-    }
-
-    fn get_token_color(&self) -> TokenColor {
-        self.token_color
     }
 }
 

@@ -7,22 +7,19 @@ use crate::system::gba::{GbaKey, GBA};
 
 #[derive(Clone)]
 pub struct PlayerTurn {
-    token_color: TokenColor,
     cursor: Cursor,
 }
 
 impl PlayerTurn {
-    pub fn new(token_color: TokenColor) -> Self {
+    pub fn new() -> Self {
         let cursor = Cursor::new();
-        Self {
-            token_color,
-            cursor,
-        }
+        Self { cursor }
     }
 
     pub fn update(
         &mut self,
         gba: &GBA,
+        token_color: TokenColor,
         anim_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
         cpu_face: Option<&mut CpuFace>,
@@ -41,7 +38,7 @@ impl PlayerTurn {
 
             if let Some(row) = row {
                 // If the player blocks the CPU, then he should be angry.
-                if game_board.is_winning_token(col, row, self.token_color.opposite()) {
+                if game_board.is_winning_token(col, row, token_color.opposite()) {
                     if let Some(cpu_face) = cpu_face {
                         cpu_face.set_emotion(CpuEmotion::Mad);
                     }
