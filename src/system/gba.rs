@@ -109,6 +109,9 @@ impl GBA {
         IME.write(true);
 
         RUST_IRQ_HANDLER.write(Some(update_input));
+
+        // We will start TIMER 3 to be used only for seeding RNG
+        TIMER3_CONTROL.write(TimerControl::new().with_enabled(true))
     }
 
     fn hide_all_objects(&mut self) {

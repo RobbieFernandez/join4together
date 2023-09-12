@@ -138,16 +138,6 @@ impl<'a> LoadedBackground<'a> {
         let screenblock_width = self.background.size.screenblock_width();
         let charblock_start: u16 = self.charblock_memory.get_start().try_into().unwrap();
 
-        use core::fmt::Write;
-        use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel};
-        let log_level = MgbaMessageLevel::Debug;
-
-        let mut logger = MgbaBufferedLogger::try_new(log_level);
-
-        if let Ok(ref mut logger) = logger {
-            writeln!(logger, "Require screenblocks: {}", num_screenblocks).ok();
-        }
-
         for i in 0..num_screenblocks {
             // First figure out the starting row for this screenblock.
             let row_offset = i / screenblock_width * SCREENBLOCK_SIZE;
@@ -162,10 +152,6 @@ impl<'a> LoadedBackground<'a> {
                 let row_mem = screenblock.get_row(row).unwrap();
 
                 let row_start = row * SCREENBLOCK_SIZE + row_offset;
-
-                if let Ok(ref mut logger) = logger {
-                    writeln!(logger, "Starting row: {}", row_start).ok();
-                }
 
                 let col_start = row_start + col_offset;
 

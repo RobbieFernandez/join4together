@@ -1,5 +1,8 @@
 use core::cmp::Ordering;
 
+use gba::prelude::TIMER3_COUNT;
+use gba::random::{Gen32, Lcg32};
+
 use crate::system::constants::BOARD_COLUMNS;
 
 use super::cpu_face::{CpuEmotion, CpuFace};
@@ -33,15 +36,20 @@ enum CpuState {
 pub struct CpuTurn {
     state: CpuState,
     cursor: Cursor,
+    rng: Lcg32,
 }
 
 impl CpuTurn {
     pub fn new() -> Self {
         let deciding_state = DecidingState::new();
+        // Seed with the timer value as a somewhat "random" source.
+        let seed: u32 = TIMER3_COUNT.read().into();
+        let rng = Lcg32::new(seed);
 
         Self {
             state: CpuState::Deciding(deciding_state),
             cursor: Cursor::new(),
+            rng: rng,
         }
     }
 
@@ -54,7 +62,7 @@ impl CpuTurn {
     ) -> Option<usize> {
         match self.state {
             CpuState::Deciding(ref mut deciding) => {
-                let best_column = deciding.get_best_column();
+                let best_column = deciding.get_best_column(&mut self.rng);
 
                 if let Some(best_column) = best_column {
                     let moving_state = MovingState::new(best_column);
@@ -78,7 +86,7 @@ impl CpuTurn {
                         animation_controller.set_hidden();
                         animation_controller.get_obj_attr_entry().commit_to_memory();
 
-                        self.state = CpuState::Deciding(DecidingState::new());
+                        self.reset();
 
                         return Some(column);
                     } else {
@@ -91,6 +99,11 @@ impl CpuTurn {
         self.cursor.draw(animation_controller);
 
         None
+    }
+
+    fn reset(&mut self) {
+        self.state = CpuState::Deciding(DecidingState::new());
+        self.cursor = Cursor::new();
     }
 }
 
@@ -114,10 +127,32 @@ impl DecidingState {
         self.scored_columns += 1;
     }
 
-    pub fn get_best_column(&self) -> Option<usize> {
+    pub fn get_best_column(&self, rng: &mut Lcg32) -> Option<usize> {
         if self.scored_columns == self.col_scores.len() {
-            let best = (0..NUM_COLUMNS).max_by_key(|i| self.col_scores[*i].unwrap());
-            Some(best.unwrap())
+            // If multiple columns are tied for best, then choose randomly.
+            // This makes the CPU player non-deterministic
+            let best_score = self
+                .col_scores
+                .iter()
+                .map(|i| i.unwrap())
+                .max()
+                .expect("No best move found.");
+
+            let best_indices =
+                (0..NUM_COLUMNS).filter(|i| self.col_scores[*i].unwrap() == best_score);
+
+            let mut indices_buf: [usize; NUM_COLUMNS] = [0; NUM_COLUMNS];
+            let mut index_count = 0;
+
+            for (i, index) in best_indices.enumerate() {
+                index_count += 1;
+                indices_buf[i] = index;
+            }
+
+            // Slice the array to only the actual candidates and pick randomly.
+            let best = rng.pick(&indices_buf[0..index_count]);
+
+            Some(best)
         } else {
             None
         }
