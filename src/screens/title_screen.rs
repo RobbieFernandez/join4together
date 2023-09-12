@@ -14,7 +14,7 @@ use crate::{
 use super::{Screen, ScreenState};
 
 const MENU_TEXT_Y: u16 = 140;
-const MENU_TEXT_HORIZ_MARGIN: u16 = 52;
+const MENU_TEXT_HORIZ_MARGIN: u16 = 8;
 const CURSOR_X_OFFSET: u16 = 10;
 
 const BLINK_TIME_ON: u32 = 40;
@@ -93,9 +93,11 @@ impl<'a> TitleScreen<'a> {
         start_text_object.commit_to_memory();
 
         let mut vs_cpu_text_object = vs_cpu_text_sprite.create_obj_attr_entry(gba);
+        let vs_cpu_sprite_width: u16 = vs_cpu_text_sprite.sprite().width().try_into().unwrap();
+
         let vs_cpu_oa = vs_cpu_text_object.get_obj_attr_data();
         vs_cpu_oa.set_style(ObjDisplayStyle::NotDisplayed);
-        vs_cpu_oa.set_x(MENU_TEXT_HORIZ_MARGIN);
+        vs_cpu_oa.set_x(SCREEN_WIDTH / 4 - vs_cpu_sprite_width / 2 + MENU_TEXT_HORIZ_MARGIN);
         vs_cpu_oa.set_y(MENU_TEXT_Y);
         vs_cpu_text_object.commit_to_memory();
 
@@ -104,7 +106,10 @@ impl<'a> TitleScreen<'a> {
             vs_player_text_sprite.sprite().width().try_into().unwrap();
         let vs_player_oa = vs_player_text_object.get_obj_attr_data();
         vs_player_oa.set_style(ObjDisplayStyle::NotDisplayed);
-        vs_player_oa.set_x(SCREEN_WIDTH - MENU_TEXT_HORIZ_MARGIN - vs_player_sprite_width);
+        vs_player_oa.set_x(
+            SCREEN_WIDTH / 4 - vs_player_sprite_width / 2 + SCREEN_WIDTH / 2
+                - MENU_TEXT_HORIZ_MARGIN,
+        );
         vs_player_oa.set_y(MENU_TEXT_Y);
 
         vs_player_text_object.commit_to_memory();
