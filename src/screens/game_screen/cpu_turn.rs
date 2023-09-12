@@ -156,7 +156,7 @@ impl DecidingState {
         }
 
         // Don't make a move that sets up a winning move for the opponent.
-        if self.player_has_winning_move(&candidate_board, token_color) {
+        if self.player_has_winning_move(&candidate_board, opponent_color) {
             // + 1 makes sure this is chosen over a move that is not allowed.
             return i32::MIN + 1;
         }
