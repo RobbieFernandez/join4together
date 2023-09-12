@@ -2,8 +2,8 @@ use gba::prelude::VBlankIntrWait;
 
 use crate::{
     graphics::sprite::{
-        BOARD_SLOT_SPRITE, PRESS_TEXT_SPRITE, RED_TOKEN_ANIMATION, START_TEXT_SPRITE,
-        YELLOW_TOKEN_ANIMATION,
+        BOARD_SLOT_SPRITE, MENU_CURSOR_ANIMATION, PRESS_TEXT_SPRITE, RED_TOKEN_ANIMATION,
+        START_TEXT_SPRITE, VS_CPU_TEXT_SPRITE, VS_PLAYER_TEXT_SPRITE, YELLOW_TOKEN_ANIMATION,
     },
     system::gba::GBA,
 };
@@ -33,8 +33,18 @@ impl ScreenState {
                 let press_text_sprite = PRESS_TEXT_SPRITE.load(gba);
                 let start_text_sprite = START_TEXT_SPRITE.load(gba);
 
-                let mut screen =
-                    title_screen::TitleScreen::new(gba, &press_text_sprite, &start_text_sprite);
+                let vs_player_text_sprite = VS_PLAYER_TEXT_SPRITE.load(gba);
+                let vs_cpu_text_sprite = VS_CPU_TEXT_SPRITE.load(gba);
+                let cursor_animation = MENU_CURSOR_ANIMATION.load(gba);
+
+                let mut screen = title_screen::TitleScreen::new(
+                    gba,
+                    &press_text_sprite,
+                    &start_text_sprite,
+                    &vs_cpu_text_sprite,
+                    &vs_player_text_sprite,
+                    &cursor_animation,
+                );
 
                 self.screen_loop(&mut screen)
             }
