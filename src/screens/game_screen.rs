@@ -219,10 +219,13 @@ impl<'a> GameScreen<'a> {
                     .game_board
                     .is_winning_token(state.column, state.row, state.token_color)
                 {
-                    // TODO - Transition to game over screen.
-                    // if state.token_color == TokenColor::Red {
-                    //     self.cpu_face.set_emotion(cpu_face::CpuEmotion::Sad);
-                    // }
+                    // If you beat the CPU then make him sad :(
+                    let opponent_color = state.token_color.opposite();
+                    let opponent_agent = self.get_agent(opponent_color);
+
+                    if let Agent::Cpu(ref mut cpu_face, _) = opponent_agent {
+                        cpu_face.set_emotion(cpu_face::CpuEmotion::Sad)
+                    }
 
                     panic!("Game's over");
                 } else {
@@ -250,6 +253,13 @@ impl<'a> GameScreen<'a> {
                 obj.commit_to_memory();
             }
             None => {}
+        }
+    }
+
+    fn get_agent<'b>(&'b mut self, token_color: TokenColor) -> &'b mut Agent<'a> {
+        match token_color {
+            TokenColor::Red => &mut self.red_agent,
+            TokenColor::Yellow => &mut self.yellow_agent,
         }
     }
 }
