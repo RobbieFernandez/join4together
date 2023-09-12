@@ -49,7 +49,7 @@ impl CpuTurn {
         Self {
             state: CpuState::Deciding(deciding_state),
             cursor: Cursor::new(),
-            rng: rng,
+            rng,
         }
     }
 
