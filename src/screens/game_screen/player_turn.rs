@@ -2,20 +2,23 @@ use super::cpu_face::{CpuEmotion, CpuFace};
 use super::cursor::Cursor;
 use super::game_board;
 use super::turn::Turn;
-use super::Player;
+use super::TokenColor;
 use crate::graphics::sprite::AnimationController;
 use crate::system::gba::{GbaKey, GBA};
 
 #[derive(Clone)]
 pub struct PlayerTurn {
-    player: Player,
+    token_color: TokenColor,
     cursor: Cursor,
 }
 
 impl PlayerTurn {
-    pub fn new(player: Player) -> Self {
+    pub fn new(token_color: TokenColor) -> Self {
         let cursor = Cursor::new();
-        Self { player, cursor }
+        Self {
+            token_color,
+            cursor,
+        }
     }
 }
 
@@ -41,7 +44,7 @@ impl Turn for PlayerTurn {
 
             if let Some(row) = row {
                 // If the player blocks the CPU, then he should be angry.
-                if game_board.is_winning_token(col, row, self.player.opposite()) {
+                if game_board.is_winning_token(col, row, self.token_color.opposite()) {
                     cpu_face.set_emotion(CpuEmotion::Mad);
                 }
 
@@ -54,7 +57,7 @@ impl Turn for PlayerTurn {
         None
     }
 
-    fn get_player(&self) -> Player {
-        self.player
+    fn get_token_color(&self) -> TokenColor {
+        self.token_color
     }
 }

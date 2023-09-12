@@ -1,4 +1,4 @@
-use super::Player;
+use super::TokenColor;
 
 use crate::system::{
     constants::{BOARD_COLUMNS, BOARD_ROWS, BOARD_SLOTS, SCREEN_HEIGHT, SCREEN_WIDTH},
@@ -32,7 +32,7 @@ pub static DIRECTIONS: [Direction; 8] = [
 ];
 
 pub struct GameBoard<'a> {
-    matrix: [Option<Player>; BOARD_SLOTS],
+    matrix: [Option<TokenColor>; BOARD_SLOTS],
     gba: &'a GBA,
     red_token_sprite: &'a LoadedSprite<'a>,
     yellow_token_sprite: &'a LoadedSprite<'a>,
@@ -45,7 +45,7 @@ impl<'a> GameBoard<'a> {
         red_token_sprite: &'a LoadedSprite,
         yellow_token_sprite: &'a LoadedSprite,
     ) -> Self {
-        let matrix: [Option<Player>; BOARD_SLOTS] = core::array::from_fn(|_| None);
+        let matrix: [Option<TokenColor>; BOARD_SLOTS] = core::array::from_fn(|_| None);
         let token_objects: [Option<LoadedObjectEntry<'a>>; BOARD_SLOTS] =
             core::array::from_fn(|_| None);
 
@@ -65,7 +65,12 @@ impl<'a> GameBoard<'a> {
         SCREEN_HEIGHT - (row_number + 1) * board_slot_height
     }
 
-    pub fn set_cell(&mut self, player: Player, column_number: usize, row_number: usize) -> usize {
+    pub fn set_cell(
+        &mut self,
+        token_color: TokenColor,
+        column_number: usize,
+        row_number: usize,
+    ) -> usize {
         let num_columns: usize = BOARD_COLUMNS.try_into().unwrap();
         assert!(column_number < num_columns);
 
@@ -76,28 +81,28 @@ impl<'a> GameBoard<'a> {
         let cell = &mut self.matrix[cell_index];
 
         // Mark this cell as occupied by the player.
-        cell.replace(player);
+        cell.replace(token_color);
 
         // Add an obj entry to draw this player's token here.
-        self.add_token_obj(player, column_number, row_number)
+        self.add_token_obj(token_color, column_number, row_number)
     }
 
-    pub fn is_winning_token(&self, column: usize, row: usize, player: Player) -> bool {
+    pub fn is_winning_token(&self, column: usize, row: usize, token_color: TokenColor) -> bool {
         DIRECTIONS
             .iter()
-            .any(|direction| self.is_connected(direction, player, column, row))
+            .any(|direction| self.is_connected(direction, token_color, column, row))
     }
 
-    pub fn player_can_win(&self, column: usize, player: Player) -> bool {
+    pub fn player_can_win(&self, column: usize, token_color: TokenColor) -> bool {
         let row = self.get_next_free_row(column);
 
         match row {
-            Some(row) => self.is_winning_token(column, row, player),
+            Some(row) => self.is_winning_token(column, row, token_color),
             None => false,
         }
     }
 
-    pub fn get_board_after_move(&self, column: usize, player: Player) -> Self {
+    pub fn get_board_after_move(&self, column: usize, token_color: TokenColor) -> Self {
         let mut new_matrix = self.matrix;
 
         let row = self.get_next_free_row(column);
@@ -106,7 +111,7 @@ impl<'a> GameBoard<'a> {
             let num_rows: usize = BOARD_ROWS.try_into().unwrap();
             let column_start = column * num_rows;
             let cell_index = column_start + row;
-            new_matrix[cell_index] = Some(player);
+            new_matrix[cell_index] = Some(token_color);
         }
 
         Self {
@@ -123,7 +128,7 @@ impl<'a> GameBoard<'a> {
         column: usize,
         row: usize,
         direction: &Direction,
-    ) -> Option<Player> {
+    ) -> Option<TokenColor> {
         let coords = self.move_index_in_direction(column, row, direction);
 
         if let Some((col, row)) = coords {
@@ -143,16 +148,16 @@ impl<'a> GameBoard<'a> {
         &mut self.token_objects[index]
     }
 
-    fn add_token_obj(&mut self, player: Player, col: usize, row: usize) -> usize {
+    fn add_token_obj(&mut self, token_color: TokenColor, col: usize, row: usize) -> usize {
         let num_rows: usize = BOARD_ROWS.try_into().unwrap();
         let column_start = col * num_rows;
         let cell_index = column_start + row;
 
         let x_pos = get_token_x_position(col);
 
-        let sprite = match player {
-            Player::Red => self.red_token_sprite,
-            Player::Yellow => self.yellow_token_sprite,
+        let sprite = match token_color {
+            TokenColor::Red => self.red_token_sprite,
+            TokenColor::Yellow => self.yellow_token_sprite,
         };
 
         let obj_slot = &mut self.token_objects[cell_index];
@@ -240,7 +245,7 @@ impl<'a> GameBoard<'a> {
         }
     }
 
-    fn check_token(&self, column: usize, row: usize) -> Option<Player> {
+    fn check_token(&self, column: usize, row: usize) -> Option<TokenColor> {
         let num_rows: usize = BOARD_ROWS.try_into().unwrap();
         let index = column * num_rows + row;
 
@@ -256,7 +261,7 @@ impl<'a> GameBoard<'a> {
         starting_column: usize,
         starting_row: usize,
         direction: &Direction,
-        player: Player,
+        token_color: TokenColor,
     ) -> usize {
         let mut current_col = starting_column;
         let mut current_row = starting_row;
@@ -267,7 +272,7 @@ impl<'a> GameBoard<'a> {
             let new_coords = self.move_index_in_direction(current_col, current_row, direction);
 
             if let Some((new_col, new_row)) = new_coords {
-                if self.check_token(new_col, new_row) == Some(player) {
+                if self.check_token(new_col, new_row) == Some(token_color) {
                     length += 1;
                     current_col = new_col;
                     current_row = new_row;
@@ -285,18 +290,18 @@ impl<'a> GameBoard<'a> {
     fn is_connected(
         &self,
         direction: &Direction,
-        player: Player,
+        token_color: TokenColor,
         column: usize,
         row: usize,
     ) -> bool {
-        let positive_distance = self.get_connected_distance(column, row, direction, player);
+        let positive_distance = self.get_connected_distance(column, row, direction, token_color);
 
         if positive_distance >= 3 {
             true
         } else {
             let opposite_direction = direction.opposite();
             let negative_distance =
-                self.get_connected_distance(column, row, &opposite_direction, player);
+                self.get_connected_distance(column, row, &opposite_direction, token_color);
 
             (positive_distance + negative_distance) >= 3
         }

@@ -28,14 +28,14 @@ const TOKEN_DROP_STARTING_SPEED: i16 = 1;
 const TOKEN_BOUNCE_SPEED_DECAY: i16 = 2;
 
 #[derive(Clone, Copy, PartialEq)]
-pub enum Player {
+pub enum TokenColor {
     Red,
     Yellow,
 }
 
 #[derive(Clone)]
 struct TokenDroppingState {
-    player: Player,
+    token_color: TokenColor,
     column: usize,
     current_y: u16,
     target_y: u16,
@@ -79,7 +79,7 @@ impl<'a> GameScreen<'a> {
         let _board_slot_objects = game_board::create_board_object_entries(board_slot_sprite, gba);
 
         // For now hardcode player is red, CPU is yellow and player goes first.
-        let game_state = GameState::PlayerTurnState(PlayerTurn::new(Player::Red));
+        let game_state = GameState::PlayerTurnState(PlayerTurn::new(TokenColor::Red));
 
         let game_board = game_board::GameBoard::new(
             gba,
@@ -117,7 +117,7 @@ impl<'a> GameScreen<'a> {
     where
         T: Turn,
     {
-        let (player, column) = take_turn(
+        let (token_color, column) = take_turn(
             turn,
             self.gba,
             &mut self.yellow_token_animation_controller,
@@ -131,11 +131,11 @@ impl<'a> GameScreen<'a> {
 
             match row {
                 Some(row) => {
-                    let obj_index = self.game_board.set_cell(player, column, row);
+                    let obj_index = self.game_board.set_cell(token_color, column, row);
                     let y_pos = game_board::get_token_y_position();
 
                     let drop_state = TokenDroppingState {
-                        player,
+                        token_color,
                         column,
                         row,
                         obj_index,
@@ -179,22 +179,22 @@ impl<'a> GameScreen<'a> {
                 // Check victory conditions, otherwise move to next player's turn.
                 if self
                     .game_board
-                    .is_winning_token(state.column, state.row, state.player)
+                    .is_winning_token(state.column, state.row, state.token_color)
                 {
                     // TODO - Transition to game over screen.
-                    if state.player == Player::Red {
+                    if state.token_color == TokenColor::Red {
                         self.cpu_face.set_emotion(cpu_face::CpuEmotion::Sad);
                     }
 
                     panic!("Game's over");
                 } else {
                     // TODO - Don't hardcode CPU/Player.
-                    match state.player {
-                        Player::Red => Some(GameState::CpuTurnState(CpuTurn::new(
-                            state.player.opposite(),
+                    match state.token_color {
+                        TokenColor::Red => Some(GameState::CpuTurnState(CpuTurn::new(
+                            state.token_color.opposite(),
                         ))),
-                        Player::Yellow => Some(GameState::PlayerTurnState(PlayerTurn::new(
-                            state.player.opposite(),
+                        TokenColor::Yellow => Some(GameState::PlayerTurnState(PlayerTurn::new(
+                            state.token_color.opposite(),
                         ))),
                     }
                 }
@@ -231,23 +231,23 @@ fn take_turn<'a, T: Turn>(
     red_token_animation_controller: &mut AnimationController<'a, 4>,
     game_board: &mut game_board::GameBoard,
     cpu_face: &mut cpu_face::CpuFace,
-) -> (Player, Option<usize>) {
-    let player = turn.get_player();
+) -> (TokenColor, Option<usize>) {
+    let token_color = turn.get_token_color();
 
-    let animation_controller = match player {
-        Player::Red => red_token_animation_controller,
-        Player::Yellow => yellow_token_animation_controller,
+    let animation_controller = match token_color {
+        TokenColor::Red => red_token_animation_controller,
+        TokenColor::Yellow => yellow_token_animation_controller,
     };
 
     let column = turn.update(gba, animation_controller, game_board, cpu_face);
-    (player, column)
+    (token_color, column)
 }
 
-impl Player {
-    pub fn opposite(&self) -> Player {
+impl TokenColor {
+    pub fn opposite(&self) -> TokenColor {
         match self {
-            Player::Red => Player::Yellow,
-            Player::Yellow => Player::Red,
+            TokenColor::Red => TokenColor::Yellow,
+            TokenColor::Yellow => TokenColor::Red,
         }
     }
 }

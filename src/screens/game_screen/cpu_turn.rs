@@ -7,7 +7,7 @@ use super::cpu_face::{CpuEmotion, CpuFace};
 use super::cursor::Cursor;
 use super::game_board;
 use super::turn::Turn;
-use super::Player;
+use super::TokenColor;
 use crate::graphics::sprite::AnimationController;
 
 const NUM_COLUMNS: usize = BOARD_COLUMNS as usize;
@@ -33,20 +33,20 @@ enum CpuState {
 
 #[derive(Clone)]
 pub struct CpuTurn {
-    player: Player,
+    token_color: TokenColor,
     state: CpuState,
     cursor: Cursor,
 }
 
 impl CpuTurn {
-    pub fn new(player: Player) -> Self {
+    pub fn new(token_color: TokenColor) -> Self {
         let deciding_state = DecidingState {
             col_scores: [None; NUM_COLUMNS],
             scored_columns: 0,
         };
 
         Self {
-            player,
+            token_color,
             state: CpuState::Deciding(deciding_state),
             cursor: Cursor::new(),
         }
@@ -61,7 +61,7 @@ impl Turn for CpuTurn {
         game_board: &mut game_board::GameBoard,
         cpu_face: &mut CpuFace,
     ) -> Option<usize> {
-        let player = self.get_player();
+        let token_color = self.get_token_color();
 
         match self.state {
             CpuState::Deciding(ref mut deciding) => {
@@ -71,7 +71,7 @@ impl Turn for CpuTurn {
                     let moving_state = MovingState::new(best_column);
                     self.state = CpuState::Moving(moving_state);
                 } else {
-                    deciding.score_next_column(player, game_board, cpu_face);
+                    deciding.score_next_column(token_color, game_board, cpu_face);
                 }
             }
             CpuState::Moving(ref mut moving) => {
@@ -82,7 +82,7 @@ impl Turn for CpuTurn {
                     let row = game_board.get_next_free_row(column);
 
                     if let Some(row) = row {
-                        if !game_board.is_winning_token(column, row, self.player) {
+                        if !game_board.is_winning_token(column, row, self.token_color) {
                             cpu_face.set_emotion(CpuEmotion::Neutral);
                         }
 
@@ -102,19 +102,19 @@ impl Turn for CpuTurn {
         None
     }
 
-    fn get_player(&self) -> Player {
-        self.player
+    fn get_token_color(&self) -> TokenColor {
+        self.token_color
     }
 }
 
 impl DecidingState {
     pub fn score_next_column(
         &mut self,
-        player: Player,
+        token_color: TokenColor,
         game_board: &mut game_board::GameBoard,
         cpu_face: &mut CpuFace,
     ) {
-        let score = self.score_column(player, game_board, self.scored_columns, cpu_face);
+        let score = self.score_column(token_color, game_board, self.scored_columns, cpu_face);
 
         self.col_scores[self.scored_columns] = Some(score);
         self.scored_columns += 1;
@@ -131,7 +131,7 @@ impl DecidingState {
 
     fn score_column(
         &self,
-        player: Player,
+        token_color: TokenColor,
         game_board: &mut game_board::GameBoard,
         column_number: usize,
         cpu_face: &mut CpuFace,
@@ -144,31 +144,31 @@ impl DecidingState {
 
         let row = row.unwrap();
 
-        let opponent = player.opposite();
+        let opponent_color = token_color.opposite();
 
         // See what the board will look like after this move is made.
-        let candidate_board = game_board.get_board_after_move(column_number, player);
+        let candidate_board = game_board.get_board_after_move(column_number, token_color);
 
         // First priority is to choose a winning move.
-        if game_board.player_can_win(column_number, player) {
+        if game_board.player_can_win(column_number, token_color) {
             cpu_face.set_emotion(CpuEmotion::Happy);
             return i32::MAX;
         };
 
         // Next priority is to block opponent's winning move.
-        if game_board.player_can_win(column_number, opponent) {
+        if game_board.player_can_win(column_number, opponent_color) {
             cpu_face.set_emotion(CpuEmotion::Surprised);
             return i32::MAX - 1;
         }
 
         // Don't make a move that sets up a winning move for the opponent.
-        if self.player_has_winning_move(&candidate_board, opponent) {
+        if self.player_has_winning_move(&candidate_board, token_color) {
             // + 1 makes sure this is chosen over a move that is not allowed.
             return i32::MIN + 1;
         }
 
         // Then see if you can set up a winning move.
-        if self.player_has_winning_move(&candidate_board, player) {
+        if self.player_has_winning_move(&candidate_board, token_color) {
             return i32::MAX - 2;
         }
 
@@ -181,7 +181,7 @@ impl DecidingState {
                 + match neighbour {
                     None => 0,
                     Some(color) => {
-                        if color == player {
+                        if color == token_color {
                             1
                         } else {
                             2
@@ -191,8 +191,12 @@ impl DecidingState {
         })
     }
 
-    fn player_has_winning_move(&self, game_board: &game_board::GameBoard, player: Player) -> bool {
-        (0..NUM_COLUMNS).any(|column| game_board.player_can_win(column, player))
+    fn player_has_winning_move(
+        &self,
+        game_board: &game_board::GameBoard,
+        token_color: TokenColor,
+    ) -> bool {
+        (0..NUM_COLUMNS).any(|column| game_board.player_can_win(column, token_color))
     }
 }
 

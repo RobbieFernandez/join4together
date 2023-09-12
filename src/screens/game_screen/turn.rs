@@ -1,6 +1,6 @@
 use crate::{graphics::sprite::AnimationController, system::gba::GBA};
 
-use super::{cpu_face::CpuFace, game_board, Player};
+use super::{cpu_face::CpuFace, game_board, TokenColor};
 
 pub trait Turn {
     fn update(
@@ -11,5 +11,5 @@ pub trait Turn {
         cpu_face: &mut CpuFace,
     ) -> Option<usize>;
 
-    fn get_player(&self) -> Player;
+    fn get_token_color(&self) -> TokenColor;
 }
