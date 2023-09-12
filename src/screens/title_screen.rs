@@ -99,8 +99,11 @@ impl<'a> TitleScreen<'a> {
 impl<'a> Screen for TitleScreen<'a> {
     fn update(&mut self) -> Option<ScreenState> {
         self.update_blinking_text();
+
         if self.gba.key_was_pressed(GbaKey::START) {
-            Some(ScreenState::GameScreen)
+            Some(ScreenState::VsCpuScreen)
+        } else if self.gba.key_was_pressed(GbaKey::SELECT) {
+            Some(ScreenState::VsPlayerScreen)
         } else {
             None
         }

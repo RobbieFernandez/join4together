@@ -1,12 +1,10 @@
 use core::cmp::Ordering;
 
 use crate::system::constants::BOARD_COLUMNS;
-use crate::system::gba::GBA;
 
 use super::cpu_face::{CpuEmotion, CpuFace};
 use super::cursor::Cursor;
 use super::game_board;
-use super::turn::Turn;
 use super::TokenColor;
 use crate::graphics::sprite::AnimationController;
 
@@ -40,10 +38,7 @@ pub struct CpuTurn {
 
 impl CpuTurn {
     pub fn new(token_color: TokenColor) -> Self {
-        let deciding_state = DecidingState {
-            col_scores: [None; NUM_COLUMNS],
-            scored_columns: 0,
-        };
+        let deciding_state = DecidingState::new();
 
         Self {
             token_color,
@@ -51,12 +46,9 @@ impl CpuTurn {
             cursor: Cursor::new(),
         }
     }
-}
 
-impl Turn for CpuTurn {
-    fn update(
+    pub fn update(
         &mut self,
-        _gba: &GBA,
         animation_controller: &mut AnimationController<4>,
         game_board: &mut game_board::GameBoard,
         cpu_face: &mut CpuFace,
@@ -89,6 +81,8 @@ impl Turn for CpuTurn {
                         animation_controller.set_hidden();
                         animation_controller.get_obj_attr_entry().commit_to_memory();
 
+                        self.state = CpuState::Deciding(DecidingState::new());
+
                         return Some(column);
                     } else {
                         panic!("CPU chose invalid best move.")
@@ -108,6 +102,13 @@ impl Turn for CpuTurn {
 }
 
 impl DecidingState {
+    pub fn new() -> Self {
+        Self {
+            col_scores: [None; NUM_COLUMNS],
+            scored_columns: 0,
+        }
+    }
+
     pub fn score_next_column(
         &mut self,
         token_color: TokenColor,

@@ -1,3 +1,4 @@
+use crate::system::constants::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::system::gba::GBA;
 
 use crate::graphics::sprite::{
@@ -75,8 +76,14 @@ impl<'a> CpuSprites<'a> {
 }
 
 impl<'a> CpuFace<'a> {
-    pub fn new(gba: &'a GBA, x_pos: u16, y_pos: u16, cpu_sprites: &'a CpuSprites<'a>) -> Self {
+    pub fn new(gba: &'a GBA, cpu_sprites: &'a CpuSprites<'a>) -> Self {
         let mut cpu_head_obj = cpu_sprites.get_head_sprite().create_obj_attr_entry(gba);
+
+        let cpu_head_height: u16 = CpuSprites::height().try_into().unwrap();
+        let cpu_head_width: u16 = CpuSprites::width().try_into().unwrap();
+
+        let y_pos = SCREEN_HEIGHT - cpu_head_height;
+        let x_pos = SCREEN_WIDTH - cpu_head_width - 5;
 
         let mut cpu_face_obj = cpu_sprites
             .get_face_sprite(CpuEmotion::Neutral)

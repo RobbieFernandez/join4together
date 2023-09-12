@@ -8,14 +8,18 @@ use crate::{
     system::gba::GBA,
 };
 
-use self::game_screen::cpu_face::CpuSprites;
+use self::game_screen::{
+    cpu_face::{CpuFace, CpuSprites},
+    TokenColor,
+};
 
 pub mod game_screen;
 pub mod title_screen;
 
 pub enum ScreenState {
     TitleScreen,
-    GameScreen,
+    VsCpuScreen,
+    VsPlayerScreen,
 }
 
 pub trait Screen {
@@ -37,23 +41,44 @@ impl ScreenState {
 
                 self.screen_loop(&mut screen)
             }
-            ScreenState::GameScreen => {
-                let yellow_token_animation = YELLOW_TOKEN_ANIMATION.load(gba);
-                let red_token_animation = RED_TOKEN_ANIMATION.load(gba);
-                let board_slot_sprite = BOARD_SLOT_SPRITE.load(gba);
+            ScreenState::VsCpuScreen => {
                 let cpu_sprites = CpuSprites::new(gba);
+                let cpu_face = CpuFace::new(gba, &cpu_sprites);
 
-                let mut screen = game_screen::GameScreen::new(
-                    gba,
-                    &red_token_animation,
-                    &yellow_token_animation,
-                    &board_slot_sprite,
-                    &cpu_sprites,
-                );
+                let red_agent = game_screen::Agent::new_human_agent(TokenColor::Red);
+                let yellow_agent = game_screen::Agent::new_cpu_agent(TokenColor::Yellow, cpu_face);
 
-                self.screen_loop(&mut screen)
+                self.exec_game_screen(gba, red_agent, yellow_agent)
+            }
+            ScreenState::VsPlayerScreen => {
+                let red_agent = game_screen::Agent::new_human_agent(TokenColor::Red);
+                let yellow_agent = game_screen::Agent::new_human_agent(TokenColor::Red);
+
+                self.exec_game_screen(gba, red_agent, yellow_agent)
             }
         }
+    }
+
+    pub fn exec_game_screen(
+        &self,
+        gba: &GBA,
+        red_agent: game_screen::Agent,
+        yellow_agent: game_screen::Agent,
+    ) -> ScreenState {
+        let yellow_token_animation = YELLOW_TOKEN_ANIMATION.load(gba);
+        let red_token_animation = RED_TOKEN_ANIMATION.load(gba);
+        let board_slot_sprite = BOARD_SLOT_SPRITE.load(gba);
+
+        let mut screen = game_screen::GameScreen::new(
+            gba,
+            &red_token_animation,
+            &yellow_token_animation,
+            &board_slot_sprite,
+            red_agent,
+            yellow_agent,
+        );
+
+        self.screen_loop(&mut screen)
     }
 
     fn screen_loop<S: Screen>(&self, screen: &mut S) -> ScreenState {
