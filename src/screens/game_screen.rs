@@ -4,12 +4,14 @@ use self::cpu_face::CpuFace;
 
 use super::{Screen, ScreenState};
 use crate::graphics::background::{LoadedBackground, BOARD_BACKGROUND};
+use crate::graphics::effects::Blinker;
 use crate::graphics::sprite::{
     AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite, BOARD_SLOT_SPRITE,
     RED_TOKEN_ANIMATION, YELLOW_TOKEN_ANIMATION,
 };
 use crate::system::{constants::BOARD_SLOTS, gba::GBA};
 use cpu_turn::CpuTurn;
+use game_board::WinningPositions;
 use player_turn::PlayerTurn;
 
 pub mod cpu_face;
@@ -23,6 +25,9 @@ const TOKEN_DROP_SPEED_GRADIENT: i16 = 1;
 const TOKEN_DROP_STARTING_SPEED: i16 = 1;
 
 const TOKEN_BOUNCE_SPEED_DECAY: i16 = 2;
+
+const WINNING_TOKEN_BLINK_TIME_ON: u32 = 40;
+const WINNING_TOKEN_BLINK_TIME_OFF: u32 = 20;
 
 pub enum Agent<'a> {
     Human(PlayerTurn),
@@ -48,9 +53,17 @@ struct TokenDroppingState {
 }
 
 #[derive(Clone)]
+struct GameOverState {
+    winning_color: Option<TokenColor>,
+    winning_token_positions: Option<WinningPositions>,
+    blinker: Blinker,
+}
+
+#[derive(Clone)]
 enum GameState {
     TurnState(TokenColor),
     TokenDropping(TokenDroppingState),
+    GameOver(GameOverState),
 }
 
 pub struct GameScreen<'a> {
@@ -236,21 +249,19 @@ impl<'a> GameScreen<'a> {
                 // Bouncing animation has
                 // Turn is over now.
                 // Check victory conditions, otherwise move to next player's turn.
-                if self
-                    .game_board
-                    .is_winning_token(state.column, state.row, state.token_color)
-                {
-                    // If you beat the CPU then make him sad :(
-                    let opponent_color = state.token_color.opposite();
-                    let opponent_agent = self.get_agent(opponent_color);
+                let winning_positions = self.game_board.get_winning_token_positions(
+                    state.column,
+                    state.row,
+                    state.token_color,
+                );
 
-                    if let Agent::Cpu(ref mut cpu_face, _) = opponent_agent {
-                        cpu_face.set_emotion(cpu_face::CpuEmotion::Sad)
+                match winning_positions {
+                    Some(winning_positions) => {
+                        let new_state =
+                            self.get_player_winning_state(state.token_color, winning_positions);
+                        Some(new_state)
                     }
-
-                    panic!("Game's over");
-                } else {
-                    Some(GameState::TurnState(state.token_color.opposite()))
+                    None => Some(GameState::TurnState(state.token_color.opposite())),
                 }
             } else {
                 state.num_bounces += 1;
@@ -277,11 +288,52 @@ impl<'a> GameScreen<'a> {
         }
     }
 
+    fn update_game_over(&mut self, state: &mut GameOverState) -> Option<GameState> {
+        state.blinker.update();
+
+        if let Some(winning_positions) = state.winning_token_positions {
+            for i in winning_positions {
+                let mut token_obj = self.game_board.get_token_obj_entry_mut(i).as_mut().unwrap();
+                state.blinker.apply_to_object(&mut token_obj);
+                token_obj.commit_to_memory();
+            }
+        }
+
+        None
+    }
+
     fn get_agent<'b>(&'b mut self, token_color: TokenColor) -> &'b mut Agent<'a> {
         match token_color {
             TokenColor::Red => &mut self.red_agent,
             TokenColor::Yellow => &mut self.yellow_agent,
         }
+    }
+
+    fn get_player_winning_state(
+        &mut self,
+        winning_color: TokenColor,
+        winning_token_positions: WinningPositions,
+    ) -> GameState {
+        let blinker = Blinker::new(
+            WINNING_TOKEN_BLINK_TIME_ON,
+            WINNING_TOKEN_BLINK_TIME_OFF,
+            false,
+        );
+
+        let game_over_state = GameOverState {
+            blinker,
+            winning_color: Some(winning_color),
+            winning_token_positions: Some(winning_token_positions),
+        };
+
+        // If the losing player is a CPU, then he becomes sad :(
+        let losing_color = winning_color.opposite();
+        let losing_agent = self.get_agent(losing_color);
+        if let Agent::Cpu(ref mut cpu_face, _) = losing_agent {
+            cpu_face.set_emotion(cpu_face::CpuEmotion::Sad);
+        }
+
+        GameState::GameOver(game_over_state)
     }
 }
 
@@ -303,6 +355,7 @@ impl<'a> Screen for GameScreen<'a> {
             GameState::TokenDropping(ref mut token_state) => {
                 self.update_token_dropping(token_state)
             }
+            GameState::GameOver(ref mut game_over_state) => self.update_game_over(game_over_state),
         };
 
         if let Some(new_state) = new_state {

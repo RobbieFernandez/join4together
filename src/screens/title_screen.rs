@@ -3,6 +3,7 @@ use gba::prelude::ObjDisplayStyle;
 use crate::{
     graphics::{
         background::{LoadedBackground, TITLE_SCREEN_BACKGROUND},
+        effects::Blinker,
         sprite::{
             AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite,
             MENU_CURSOR_ANIMATION, PRESS_TEXT_SPRITE, START_TEXT_SPRITE, VS_CPU_TEXT_SPRITE,
@@ -30,12 +31,6 @@ const BLINK_TIME_OFF: u32 = 20;
 const CPU_HEAD_POS: (u16, u16) = (133, 49);
 const GAME_TRANSITION_TIME: u16 = 40;
 
-#[derive(Clone)]
-enum BlinkState {
-    On(u32),
-    Off(u32),
-}
-
 #[derive(Clone, Debug)]
 enum MenuEntry {
     VsCpu,
@@ -44,7 +39,7 @@ enum MenuEntry {
 
 #[derive(Clone)]
 struct PressStartState {
-    blink_state: BlinkState,
+    blinker: Blinker,
 }
 
 #[derive(Clone)]
@@ -176,7 +171,7 @@ impl<'a> TitleScreen<'a> {
             .commit_to_memory();
 
         let state = TitleScreenState::PressStart(PressStartState {
-            blink_state: BlinkState::On(0),
+            blinker: Blinker::new(BLINK_TIME_ON, BLINK_TIME_OFF, true),
         });
 
         let mut cpu_face = CpuFace::new(gba, &loaded_data.cpu_sprites);
@@ -197,24 +192,17 @@ impl<'a> TitleScreen<'a> {
     }
 
     fn update_press_start(&mut self, mut press_start_state: PressStartState) {
-        press_start_state.blink_state = match press_start_state.blink_state {
-            BlinkState::On(t) => {
-                if t >= BLINK_TIME_ON {
-                    self.hide_press_start_text();
-                    BlinkState::Off(0)
-                } else {
-                    BlinkState::On(t + 1)
-                }
-            }
-            BlinkState::Off(t) => {
-                if t >= BLINK_TIME_OFF {
-                    self.show_press_start_text();
-                    BlinkState::On(0)
-                } else {
-                    BlinkState::Off(t + 1)
-                }
-            }
-        };
+        press_start_state.blinker.update();
+        press_start_state
+            .blinker
+            .apply_to_object(&mut self.press_text_object);
+
+        press_start_state
+            .blinker
+            .apply_to_object(&mut self.start_text_object);
+
+        self.press_text_object.commit_to_memory();
+        self.start_text_object.commit_to_memory();
 
         self.state = TitleScreenState::PressStart(press_start_state);
 
@@ -324,14 +312,6 @@ impl<'a> TitleScreen<'a> {
         for obj in [&mut self.press_text_object, &mut self.start_text_object] {
             let oa = obj.get_obj_attr_data();
             oa.set_style(ObjDisplayStyle::NotDisplayed);
-            obj.commit_to_memory();
-        }
-    }
-
-    fn show_press_start_text(&mut self) {
-        for obj in [&mut self.press_text_object, &mut self.start_text_object] {
-            let oa = obj.get_obj_attr_data();
-            oa.set_style(ObjDisplayStyle::Normal);
             obj.commit_to_memory();
         }
     }

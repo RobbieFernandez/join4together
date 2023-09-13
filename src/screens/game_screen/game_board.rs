@@ -9,6 +9,8 @@ use crate::graphics::sprite::{
     LoadedObjectEntry, LoadedSprite, BOARD_SLOT_SPRITE, RED_TOKEN_FRAME_0_SPRITE,
 };
 
+pub type WinningPositions = [usize; 4];
+
 pub enum Direction {
     North,
     East,
@@ -87,17 +89,32 @@ impl<'a> GameBoard<'a> {
         self.add_token_obj(token_color, column_number, row_number)
     }
 
-    pub fn is_winning_token(&self, column: usize, row: usize, token_color: TokenColor) -> bool {
+    pub fn get_winning_token_positions(
+        &self,
+        column: usize,
+        row: usize,
+        token_color: TokenColor,
+    ) -> Option<WinningPositions> {
         DIRECTIONS
             .iter()
-            .any(|direction| self.is_connected(direction, token_color, column, row))
+            .map(|direction| self.get_connected_line(direction, token_color, column, row))
+            .filter(|l| l.is_some())
+            .map(|l| l.unwrap())
+            .next()
+    }
+
+    pub fn is_winning_token(&self, column: usize, row: usize, token_color: TokenColor) -> bool {
+        self.get_winning_token_positions(column, row, token_color)
+            .is_some()
     }
 
     pub fn player_can_win(&self, column: usize, token_color: TokenColor) -> bool {
         let row = self.get_next_free_row(column);
 
         match row {
-            Some(row) => self.is_winning_token(column, row, token_color),
+            Some(row) => self
+                .get_winning_token_positions(column, row, token_color)
+                .is_some(),
             None => false,
         }
     }
@@ -149,9 +166,7 @@ impl<'a> GameBoard<'a> {
     }
 
     fn add_token_obj(&mut self, token_color: TokenColor, col: usize, row: usize) -> usize {
-        let num_rows: usize = BOARD_ROWS.try_into().unwrap();
-        let column_start = col * num_rows;
-        let cell_index = column_start + row;
+        let cell_index = self.calculate_index(col, row);
 
         let x_pos = get_token_x_position(col);
 
@@ -256,26 +271,33 @@ impl<'a> GameBoard<'a> {
         }
     }
 
-    fn get_connected_distance(
+    fn get_connected_positions(
         &self,
         starting_column: usize,
         starting_row: usize,
         direction: &Direction,
         token_color: TokenColor,
-    ) -> usize {
+    ) -> ([usize; 3], usize) {
         let mut current_col = starting_column;
         let mut current_row = starting_row;
 
         let mut length: usize = 0;
+        let mut token_positions = [0; 3];
 
         loop {
             let new_coords = self.move_index_in_direction(current_col, current_row, direction);
 
             if let Some((new_col, new_row)) = new_coords {
                 if self.check_token(new_col, new_row) == Some(token_color) {
+                    token_positions[length] = self.calculate_index(new_col, new_row);
                     length += 1;
+
                     current_col = new_col;
                     current_row = new_row;
+
+                    if length == 3 {
+                        break;
+                    }
                 } else {
                     break;
                 }
@@ -284,27 +306,58 @@ impl<'a> GameBoard<'a> {
             }
         }
 
-        length
+        (token_positions, length)
     }
 
-    fn is_connected(
+    fn get_connected_line(
         &self,
         direction: &Direction,
         token_color: TokenColor,
         column: usize,
         row: usize,
-    ) -> bool {
-        let positive_distance = self.get_connected_distance(column, row, direction, token_color);
+    ) -> Option<WinningPositions> {
+        // An array that will hold 4 co-ordinates. Initially it will just be the starting token,
+        // But we will add in adjacent tokens until we have filled it.
+        let mut connected_positions = [(0); 4];
+        let mut connected_length = 1;
+        connected_positions[0] = self.calculate_index(column, row);
 
-        if positive_distance >= 3 {
-            true
+        let (positive_connections, positive_distance) =
+            self.get_connected_positions(column, row, direction, token_color);
+
+        for i in 0..positive_distance {
+            connected_positions[i + 1] = positive_connections[i];
+        }
+
+        connected_length += positive_distance;
+
+        if connected_length == 4 {
+            Some(connected_positions)
         } else {
             let opposite_direction = direction.opposite();
-            let negative_distance =
-                self.get_connected_distance(column, row, &opposite_direction, token_color);
 
-            (positive_distance + negative_distance) >= 3
+            let (negative_connections, negative_distance) =
+                self.get_connected_positions(column, row, &opposite_direction, token_color);
+
+            if connected_length + negative_distance < 4 {
+                // Still not enough connected tokens, so return early
+                None
+            } else {
+                // There are enough new tokens to make this a connected line. Add these new elements to the array and return it
+                let remaining_tokens = 4 - connected_length;
+                for i in 0..remaining_tokens {
+                    connected_positions[connected_length + i] = negative_connections[i];
+                }
+                Some(connected_positions)
+            }
         }
+    }
+
+    fn calculate_index(&self, col: usize, row: usize) -> usize {
+        let num_rows: usize = BOARD_ROWS.try_into().unwrap();
+        let column_start = col * num_rows;
+
+        column_start + row
     }
 }
 
