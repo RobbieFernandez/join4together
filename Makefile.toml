@@ -1,0 +1,54 @@
+[tasks.arm-binutils]
+install_script = '''
+if ! command -v arm-none-eabi-ld > /dev/null
+then
+    sudo apt install binutils-arm-none-eabi
+fi
+'''
+
+[tasks.rust_src]
+install_crate = { rustup_component_name = "rust-src" }
+
+
+[tasks.build-dev]
+condition = { profiles = ["development"] }
+dependencies = ["arm-binutils", "rust_src"]
+command = "cargo"
+args = ["build"]
+
+
+[tasks.build-release]
+condition = { profiles = ["release"] }
+dependencies = ["arm-binutils", "rust_src"]
+command = "cargo"
+args = ["build", "--release"]
+
+
+[tasks.objcopy]
+command = "arm-none-eabi-objcopy"
+args = [
+    "-O",
+    "binary",
+    "target/thumbv4t-none-eabi/release/join4together",
+    "join4together.gba"
+]
+dependencies = ["build-dev", "build-release"]
+
+[tasks.install-gbafix]
+install_crate = { crate_name = "gbafix", binary = "gbafix", test_arg = ["--help"] }
+
+
+[tasks.gbafix]
+command = "gbafix"
+args = [
+    "-p", "join4together.gba"
+]
+dependencies = ["objcopy", "install-gbafix"]
+
+[tasks.rom]
+dependencies = ["gbafix"]
+
+[tasks.run]
+command = "mgba-qt"
+args = ["join4together.gba"]
+dependencies = ["rom"]
