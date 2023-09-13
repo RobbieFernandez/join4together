@@ -59,3 +59,9 @@ impl PlayerTurn {
         self.cursor = Cursor::new();
     }
 }
+
+impl Default for PlayerTurn {
+    fn default() -> Self {
+        Self::new()
+    }
+}

@@ -107,6 +107,12 @@ impl CpuTurn {
     }
 }
 
+impl Default for CpuTurn {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DecidingState {
     pub fn new() -> Self {
         Self {
