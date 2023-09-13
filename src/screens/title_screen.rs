@@ -3,7 +3,11 @@ use gba::prelude::ObjDisplayStyle;
 use crate::{
     graphics::{
         background::{LoadedBackground, TITLE_SCREEN_BACKGROUND},
-        sprite::{AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite},
+        sprite::{
+            AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite,
+            MENU_CURSOR_ANIMATION, PRESS_TEXT_SPRITE, START_TEXT_SPRITE, VS_CPU_TEXT_SPRITE,
+            VS_PLAYER_TEXT_SPRITE,
+        },
     },
     system::{
         constants::SCREEN_WIDTH,
@@ -73,6 +77,15 @@ pub struct TitleScreen<'a> {
     cpu_face: CpuFace<'a>,
 }
 
+pub struct TitleScreenLoadedData<'a> {
+    press_text_sprite: LoadedSprite<'a>,
+    start_text_sprite: LoadedSprite<'a>,
+    vs_cpu_text_sprite: LoadedSprite<'a>,
+    vs_player_text_sprite: LoadedSprite<'a>,
+    cursor_animation: LoadedAnimation<'a, 5>,
+    cpu_sprites: CpuSprites<'a>,
+}
+
 impl MenuEntry {
     fn next(&self) -> Self {
         match self {
@@ -82,33 +95,51 @@ impl MenuEntry {
     }
 }
 
+impl<'a> TitleScreenLoadedData<'a> {
+    pub fn new(gba: &'a GBA) -> Self {
+        let press_text_sprite = PRESS_TEXT_SPRITE.load(gba);
+        let start_text_sprite = START_TEXT_SPRITE.load(gba);
+
+        let vs_player_text_sprite = VS_PLAYER_TEXT_SPRITE.load(gba);
+        let vs_cpu_text_sprite = VS_CPU_TEXT_SPRITE.load(gba);
+        let cursor_animation = MENU_CURSOR_ANIMATION.load(gba);
+        let cpu_sprites = CpuSprites::new(gba);
+
+        Self {
+            press_text_sprite,
+            start_text_sprite,
+            vs_player_text_sprite,
+            vs_cpu_text_sprite,
+            cursor_animation,
+            cpu_sprites,
+        }
+    }
+}
+
 impl<'a> TitleScreen<'a> {
-    pub fn new(
-        gba: &'a GBA,
-        press_text_sprite: &'a LoadedSprite<'a>,
-        start_text_sprite: &'a LoadedSprite<'a>,
-        vs_cpu_text_sprite: &'a LoadedSprite<'a>,
-        vs_player_text_sprite: &'a LoadedSprite<'a>,
-        cursor_animation: &'a LoadedAnimation<'a, 5>,
-        cpu_sprites: &'a CpuSprites<'a>,
-    ) -> Self {
+    pub fn new(gba: &'a GBA, loaded_data: &'a TitleScreenLoadedData<'a>) -> Self {
         let background = TITLE_SCREEN_BACKGROUND.load(gba);
-        let mut press_text_object = press_text_sprite.create_obj_attr_entry(gba);
+        let mut press_text_object = loaded_data.press_text_sprite.create_obj_attr_entry(gba);
 
         let press_oa = press_text_object.get_obj_attr_data();
         press_oa.set_x(85);
         press_oa.set_y(MENU_TEXT_Y);
         press_text_object.commit_to_memory();
 
-        let mut start_text_object = start_text_sprite.create_obj_attr_entry(gba);
+        let mut start_text_object = loaded_data.start_text_sprite.create_obj_attr_entry(gba);
 
         let start_oa = start_text_object.get_obj_attr_data();
         start_oa.set_x(120);
         start_oa.set_y(MENU_TEXT_Y);
         start_text_object.commit_to_memory();
 
-        let mut vs_cpu_text_object = vs_cpu_text_sprite.create_obj_attr_entry(gba);
-        let vs_cpu_sprite_width: u16 = vs_cpu_text_sprite.sprite().width().try_into().unwrap();
+        let mut vs_cpu_text_object = loaded_data.vs_cpu_text_sprite.create_obj_attr_entry(gba);
+        let vs_cpu_sprite_width: u16 = loaded_data
+            .vs_cpu_text_sprite
+            .sprite()
+            .width()
+            .try_into()
+            .unwrap();
 
         let vs_cpu_oa = vs_cpu_text_object.get_obj_attr_data();
         vs_cpu_oa.set_style(ObjDisplayStyle::NotDisplayed);
@@ -116,9 +147,14 @@ impl<'a> TitleScreen<'a> {
         vs_cpu_oa.set_y(MENU_TEXT_Y);
         vs_cpu_text_object.commit_to_memory();
 
-        let mut vs_player_text_object = vs_player_text_sprite.create_obj_attr_entry(gba);
-        let vs_player_sprite_width: u16 =
-            vs_player_text_sprite.sprite().width().try_into().unwrap();
+        let mut vs_player_text_object =
+            loaded_data.vs_player_text_sprite.create_obj_attr_entry(gba);
+        let vs_player_sprite_width: u16 = loaded_data
+            .vs_player_text_sprite
+            .sprite()
+            .width()
+            .try_into()
+            .unwrap();
         let vs_player_oa = vs_player_text_object.get_obj_attr_data();
         vs_player_oa.set_style(ObjDisplayStyle::NotDisplayed);
         vs_player_oa.set_x(
@@ -129,7 +165,7 @@ impl<'a> TitleScreen<'a> {
 
         vs_player_text_object.commit_to_memory();
 
-        let mut cursor_animation_controller = cursor_animation.create_controller(gba);
+        let mut cursor_animation_controller = loaded_data.cursor_animation.create_controller(gba);
         cursor_animation_controller.set_hidden();
         let cursor_obj = cursor_animation_controller.get_obj_attr_entry();
         let cursor_oa = cursor_obj.get_obj_attr_data();
@@ -143,7 +179,7 @@ impl<'a> TitleScreen<'a> {
             blink_state: BlinkState::On(0),
         });
 
-        let mut cpu_face = CpuFace::new(gba, cpu_sprites);
+        let mut cpu_face = CpuFace::new(gba, &loaded_data.cpu_sprites);
         cpu_face.set_x(CPU_HEAD_POS.0);
         cpu_face.set_y(CPU_HEAD_POS.1);
 

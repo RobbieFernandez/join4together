@@ -5,7 +5,8 @@ use self::cpu_face::CpuFace;
 use super::{Screen, ScreenState};
 use crate::graphics::background::{LoadedBackground, BOARD_BACKGROUND};
 use crate::graphics::sprite::{
-    AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite,
+    AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite, BOARD_SLOT_SPRITE,
+    RED_TOKEN_ANIMATION, YELLOW_TOKEN_ANIMATION,
 };
 use crate::system::{constants::BOARD_SLOTS, gba::GBA};
 use cpu_turn::CpuTurn;
@@ -64,6 +65,26 @@ pub struct GameScreen<'a> {
     yellow_agent: Agent<'a>,
 }
 
+pub struct GameScreenLoadedData<'a> {
+    red_token_animation: LoadedAnimation<'a, 4>,
+    yellow_token_animation: LoadedAnimation<'a, 4>,
+    board_slot_sprite: LoadedSprite<'a>,
+}
+
+impl<'a> GameScreenLoadedData<'a> {
+    pub fn new(gba: &'a GBA) -> Self {
+        let yellow_token_animation = YELLOW_TOKEN_ANIMATION.load(gba);
+        let red_token_animation = RED_TOKEN_ANIMATION.load(gba);
+        let board_slot_sprite = BOARD_SLOT_SPRITE.load(gba);
+
+        Self {
+            yellow_token_animation,
+            red_token_animation,
+            board_slot_sprite,
+        }
+    }
+}
+
 // The agent enum just proxies the update call to the appropriate Turn struct.
 impl<'a> Agent<'a> {
     pub fn update(
@@ -101,26 +122,26 @@ impl<'a> Agent<'a> {
 impl<'a> GameScreen<'a> {
     pub fn new(
         gba: &'a GBA,
-        red_token_animation: &'a LoadedAnimation<4>,
-        yellow_token_animation: &'a LoadedAnimation<4>,
-        board_slot_sprite: &'a LoadedSprite<'a>,
+        loaded_data: &'a GameScreenLoadedData<'a>,
         red_agent: Agent<'a>,
         yellow_agent: Agent<'a>,
     ) -> Self {
-        let red_token_animation_controller = red_token_animation.create_controller(gba);
-        let yellow_token_animation_controller = yellow_token_animation.create_controller(gba);
+        let red_token_animation_controller = loaded_data.red_token_animation.create_controller(gba);
+        let yellow_token_animation_controller =
+            loaded_data.yellow_token_animation.create_controller(gba);
 
         // Create an Object entry for each slot that makes up the board.
         // We need to keep ownership of these in order to keep them in OBJRAM, so store them in an array.
-        let _board_slot_objects = game_board::create_board_object_entries(board_slot_sprite, gba);
+        let _board_slot_objects =
+            game_board::create_board_object_entries(&loaded_data.board_slot_sprite, gba);
 
         // For now hardcode red player goes first.
         let game_state = GameState::TurnState(TokenColor::Red);
 
         let game_board = game_board::GameBoard::new(
             gba,
-            red_token_animation.get_frame(0),
-            yellow_token_animation.get_frame(0),
+            loaded_data.red_token_animation.get_frame(0),
+            loaded_data.yellow_token_animation.get_frame(0),
         );
 
         let _background = BOARD_BACKGROUND.load(gba);

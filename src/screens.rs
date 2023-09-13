@@ -1,12 +1,6 @@
 use gba::prelude::VBlankIntrWait;
 
-use crate::{
-    graphics::sprite::{
-        BOARD_SLOT_SPRITE, MENU_CURSOR_ANIMATION, PRESS_TEXT_SPRITE, RED_TOKEN_ANIMATION,
-        START_TEXT_SPRITE, VS_CPU_TEXT_SPRITE, VS_PLAYER_TEXT_SPRITE, YELLOW_TOKEN_ANIMATION,
-    },
-    system::gba::GBA,
-};
+use crate::system::gba::GBA;
 
 use self::game_screen::cpu_face::{CpuFace, CpuSprites};
 
@@ -30,23 +24,8 @@ impl ScreenState {
         // Construct the required screen and run its loop until it transitions.
         match self {
             ScreenState::TitleScreen => {
-                let press_text_sprite = PRESS_TEXT_SPRITE.load(gba);
-                let start_text_sprite = START_TEXT_SPRITE.load(gba);
-
-                let vs_player_text_sprite = VS_PLAYER_TEXT_SPRITE.load(gba);
-                let vs_cpu_text_sprite = VS_CPU_TEXT_SPRITE.load(gba);
-                let cursor_animation = MENU_CURSOR_ANIMATION.load(gba);
-                let cpu_sprites = CpuSprites::new(gba);
-
-                let mut screen = title_screen::TitleScreen::new(
-                    gba,
-                    &press_text_sprite,
-                    &start_text_sprite,
-                    &vs_cpu_text_sprite,
-                    &vs_player_text_sprite,
-                    &cursor_animation,
-                    &cpu_sprites,
-                );
+                let loaded_data = title_screen::TitleScreenLoadedData::new(gba);
+                let mut screen = title_screen::TitleScreen::new(gba, &loaded_data);
 
                 self.screen_loop(&mut screen)
             }
@@ -74,18 +53,8 @@ impl ScreenState {
         red_agent: game_screen::Agent,
         yellow_agent: game_screen::Agent,
     ) -> ScreenState {
-        let yellow_token_animation = YELLOW_TOKEN_ANIMATION.load(gba);
-        let red_token_animation = RED_TOKEN_ANIMATION.load(gba);
-        let board_slot_sprite = BOARD_SLOT_SPRITE.load(gba);
-
-        let mut screen = game_screen::GameScreen::new(
-            gba,
-            &red_token_animation,
-            &yellow_token_animation,
-            &board_slot_sprite,
-            red_agent,
-            yellow_agent,
-        );
+        let loaded_data = game_screen::GameScreenLoadedData::new(gba);
+        let mut screen = game_screen::GameScreen::new(gba, &loaded_data, red_agent, yellow_agent);
 
         self.screen_loop(&mut screen)
     }
