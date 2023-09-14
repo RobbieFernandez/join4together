@@ -26,8 +26,8 @@ const TOKEN_DROP_STARTING_SPEED: i16 = 1;
 
 const TOKEN_BOUNCE_SPEED_DECAY: i16 = 2;
 
-const WINNING_TOKEN_BLINK_TIME_ON: u32 = 40;
-const WINNING_TOKEN_BLINK_TIME_OFF: u32 = 20;
+const WINNING_TOKEN_BLINK_TIME_ON: u32 = 22;
+const WINNING_TOKEN_BLINK_TIME_OFF: u32 = 8;
 
 pub enum Agent<'a> {
     Human(PlayerTurn),

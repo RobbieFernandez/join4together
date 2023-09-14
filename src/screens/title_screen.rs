@@ -26,9 +26,9 @@ const MENU_TEXT_HORIZ_MARGIN: u16 = 8;
 const CURSOR_X_OFFSET: u16 = 10;
 
 const BLINK_TIME_ON: u32 = 40;
-const BLINK_TIME_OFF: u32 = 20;
+const BLINK_TIME_OFF: u32 = 10;
 
-const CPU_HEAD_POS: (u16, u16) = (133, 49);
+const CPU_HEAD_POS: (u16, u16) = (140, 52);
 const GAME_TRANSITION_TIME: u16 = 40;
 
 #[derive(Clone, Debug)]
