@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel};
+use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel, TIMER1_COUNT, TIMER2_COUNT};
 use graphics::sprite::OBJ_PALETTE;
 
 use screens::ScreenState;
@@ -41,6 +41,8 @@ extern "C" fn main() -> ! {
     }
 
     let mut screen_state = ScreenState::TitleScreen;
+
+    audio::music::init_music();
 
     // Top-level game loop just runs the currently active screen until it transitions.
     loop {

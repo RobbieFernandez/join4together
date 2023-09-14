@@ -2,6 +2,7 @@ use core::mem::size_of;
 
 use crate::audio::noise::enable_noise;
 
+use super::irq::init_irq;
 use super::memory::block::MemoryBlockManager;
 use super::memory::series::MemorySeriesManager;
 use super::memory::strided_grid::MemoryStridedGridManager;
@@ -50,13 +51,11 @@ pub enum GbaKey {
     R,
 }
 
-extern "C" fn update_input(irq: IrqBits) {
-    if irq.vblank() {
-        let keystate = KEYINPUT.read();
+pub fn update_input() {
+    let keystate = KEYINPUT.read();
 
-        PREV_INPUT_STATE.write(CURRENT_INPUT_STATE.read());
-        CURRENT_INPUT_STATE.write(keystate);
-    }
+    PREV_INPUT_STATE.write(CURRENT_INPUT_STATE.read());
+    CURRENT_INPUT_STATE.write(keystate);
 }
 
 impl GBA {
@@ -117,10 +116,6 @@ impl GBA {
 
         // Set up the VBLANK IRQ
         DISPSTAT.write(DisplayStatus::new().with_irq_vblank(true));
-        IE.write(IrqBits::VBLANK);
-        IME.write(true);
-
-        RUST_IRQ_HANDLER.write(Some(update_input));
 
         // We will start TIMER 3 to be used only for seeding RNG
         TIMER3_CONTROL.write(TimerControl::new().with_enabled(true));
@@ -129,6 +124,8 @@ impl GBA {
         // Turn on the sound chip.
         SOUND_ENABLED.write(SoundEnable::new().with_enabled(true));
         enable_noise();
+
+        init_irq();
     }
 
     fn hide_all_objects(&mut self) {

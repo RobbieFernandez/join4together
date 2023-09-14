@@ -1,4 +1,4 @@
-use gba::prelude::VBlankIntrWait;
+use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel, VBlankIntrWait};
 
 use crate::system::gba::GBA;
 

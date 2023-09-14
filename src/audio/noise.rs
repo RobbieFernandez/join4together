@@ -24,13 +24,14 @@ pub fn enable_noise() {
 pub fn play_impact_noise() {
     let freq = NoiseFrequency::new()
         .with_enabled(true)
-        .with_stop_when_expired(false)
-        .with_r(0b011)
-        .with_s(0b0000);
+        .with_stop_when_expired(true)
+        .with_r(0b011) // Clock divider
+        .with_s(0b0000); // Pre-step frequency
 
     let env = NoiseLenEnvelope::new()
         .with_step_increasing(false)
-        .with_volume(0b0011)
+        .with_volume(0b0100)
+        .with_length(1)
         .with_step_time(0b001);
 
     NOISE_LEN_ENV.write(env);
