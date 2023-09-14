@@ -7,11 +7,14 @@ use crate::graphics::background::{LoadedBackground, BOARD_BACKGROUND};
 use crate::graphics::effects::Blinker;
 use crate::graphics::sprite::{
     AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite, BOARD_SLOT_SPRITE,
-    RED_TOKEN_ANIMATION, YELLOW_TOKEN_ANIMATION,
+    CPU_TEXT_SPRITE, P1_TEXT_SPRITE, P2_TEXT_SPRITE, RED_TOKEN_ANIMATION, WINS_TEXT_RED_SPRITE,
+    WINS_TEXT_YELLOW_SPRITE, YELLOW_TOKEN_ANIMATION,
 };
+use crate::system::constants::SCREEN_WIDTH;
 use crate::system::{constants::BOARD_SLOTS, gba::GBA};
 use cpu_turn::CpuTurn;
 use game_board::WinningPositions;
+use gba::prelude::ObjDisplayStyle;
 use player_turn::PlayerTurn;
 
 pub mod cpu_face;
@@ -28,6 +31,9 @@ const TOKEN_BOUNCE_SPEED_DECAY: i16 = 2;
 
 const WINNING_TOKEN_BLINK_TIME_ON: u32 = 22;
 const WINNING_TOKEN_BLINK_TIME_OFF: u32 = 8;
+
+const WIN_TEXT_WORD_SPACING: u16 = 4;
+const WIN_TEXT_YPOS: u16 = 5;
 
 pub enum Agent<'a> {
     Human(PlayerTurn),
@@ -76,12 +82,22 @@ pub struct GameScreen<'a> {
     _background: LoadedBackground<'a>,
     red_agent: Agent<'a>,
     yellow_agent: Agent<'a>,
+    p1_text_object: LoadedObjectEntry<'a>,
+    p2_text_object: LoadedObjectEntry<'a>,
+    cpu_text_object: LoadedObjectEntry<'a>,
+    red_wins_text_object: LoadedObjectEntry<'a>,
+    yellow_wins_text_object: LoadedObjectEntry<'a>,
 }
 
 pub struct GameScreenLoadedData<'a> {
     red_token_animation: LoadedAnimation<'a, 4>,
     yellow_token_animation: LoadedAnimation<'a, 4>,
     board_slot_sprite: LoadedSprite<'a>,
+    p1_text_sprite: LoadedSprite<'a>,
+    p2_text_sprite: LoadedSprite<'a>,
+    cpu_text_sprite: LoadedSprite<'a>,
+    red_wins_text_sprite: LoadedSprite<'a>,
+    yellow_wins_text_sprite: LoadedSprite<'a>,
 }
 
 impl<'a> GameScreenLoadedData<'a> {
@@ -90,10 +106,21 @@ impl<'a> GameScreenLoadedData<'a> {
         let red_token_animation = RED_TOKEN_ANIMATION.load(gba);
         let board_slot_sprite = BOARD_SLOT_SPRITE.load(gba);
 
+        let p1_text_sprite = P1_TEXT_SPRITE.load(gba);
+        let p2_text_sprite = P2_TEXT_SPRITE.load(gba);
+        let cpu_text_sprite = CPU_TEXT_SPRITE.load(gba);
+        let red_wins_text_sprite = WINS_TEXT_RED_SPRITE.load(gba);
+        let yellow_wins_text_sprite = WINS_TEXT_YELLOW_SPRITE.load(gba);
+
         Self {
             yellow_token_animation,
             red_token_animation,
             board_slot_sprite,
+            p1_text_sprite,
+            p2_text_sprite,
+            cpu_text_sprite,
+            red_wins_text_sprite,
+            yellow_wins_text_sprite,
         }
     }
 }
@@ -159,6 +186,14 @@ impl<'a> GameScreen<'a> {
 
         let _background = BOARD_BACKGROUND.load(gba);
 
+        let p1_text_object = loaded_data.p1_text_sprite.create_obj_attr_entry(gba);
+        let p2_text_object = loaded_data.p2_text_sprite.create_obj_attr_entry(gba);
+        let cpu_text_object = loaded_data.cpu_text_sprite.create_obj_attr_entry(gba);
+        let red_wins_text_object = loaded_data.red_wins_text_sprite.create_obj_attr_entry(gba);
+        let yellow_wins_text_object = loaded_data
+            .yellow_wins_text_sprite
+            .create_obj_attr_entry(gba);
+
         Self {
             gba,
             red_token_animation_controller,
@@ -169,6 +204,11 @@ impl<'a> GameScreen<'a> {
             _background,
             red_agent,
             yellow_agent,
+            p1_text_object,
+            p2_text_object,
+            cpu_text_object,
+            red_wins_text_object,
+            yellow_wins_text_object,
         }
     }
 
@@ -332,6 +372,43 @@ impl<'a> GameScreen<'a> {
         if let Agent::Cpu(ref mut cpu_face, _) = losing_agent {
             cpu_face.set_emotion(cpu_face::CpuEmotion::Sad);
         }
+
+        // Add the "{Player} Wins" banner.
+        let winning_player_obj = if winning_color == TokenColor::Red {
+            &mut self.p1_text_object
+        } else {
+            let winning_agent = self.get_agent(winning_color);
+            if let Agent::Human(_) = winning_agent {
+                &mut self.p2_text_object
+            } else {
+                &mut self.cpu_text_object
+            }
+        };
+
+        let wins_text_obj = match winning_color {
+            TokenColor::Red => &mut self.red_wins_text_object,
+            TokenColor::Yellow => &mut self.yellow_wins_text_object
+        };
+
+        let player_name_width: u16 = winning_player_obj.loaded_sprite().sprite().width().try_into().unwrap();
+        let wins_text_width: u16 = wins_text_obj.loaded_sprite().sprite().width().try_into().unwrap();
+        let total_width = player_name_width + wins_text_width + WIN_TEXT_WORD_SPACING;
+
+        let player_text_xpos = SCREEN_WIDTH / 2 - total_width / 2; 
+        let oa = winning_player_obj.get_obj_attr_data();
+        oa.set_x(player_text_xpos);
+        oa.set_y(WIN_TEXT_YPOS);
+        oa.set_style(ObjDisplayStyle::Normal);
+        winning_player_obj.commit_to_memory();
+
+
+        let wins_text_xpos = player_text_xpos + player_name_width + WIN_TEXT_WORD_SPACING;
+        let oa = wins_text_obj.get_obj_attr_data();
+        oa.set_x(wins_text_xpos);
+        oa.set_y(WIN_TEXT_YPOS);
+        oa.set_style(ObjDisplayStyle::Normal);
+        wins_text_obj.commit_to_memory();
+        
 
         GameState::GameOver(game_over_state)
     }
