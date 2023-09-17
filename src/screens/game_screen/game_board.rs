@@ -275,7 +275,7 @@ impl<'a> GameBoard<'a> {
         }
     }
 
-    fn get_connected_positions(
+    pub fn get_connected_positions(
         &self,
         starting_column: usize,
         starting_row: usize,
