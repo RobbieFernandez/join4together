@@ -33,7 +33,7 @@ const WINNING_TOKEN_BLINK_TIME_ON: u32 = 22;
 const WINNING_TOKEN_BLINK_TIME_OFF: u32 = 8;
 
 const WIN_TEXT_WORD_SPACING: u16 = 4;
-const WIN_TEXT_YPOS: u16 = 5;
+const WIN_TEXT_YPOS: u16 = 11;
 
 pub enum Agent<'a> {
     Human(PlayerTurn),
@@ -436,9 +436,14 @@ impl<'a> GameScreen<'a> {
     fn get_draw_game_state(&mut self) -> GameState {
         let outcome = GameOutcome::Draw;
 
-        // TODO - Make cpu shocked.
-
         let draw_text_width: u16 = self.draw_text_object.loaded_sprite().sprite().width().try_into().unwrap();
+
+        for color in [TokenColor::Yellow, TokenColor::Red] {
+            let agent = self.get_agent(color);
+            if let Agent::Cpu(ref mut face, _) = agent {
+                face.set_emotion(cpu_face::CpuEmotion::Surprised)
+            }
+        }
 
         let x_pos = (SCREEN_WIDTH - draw_text_width) / 2; 
         let oa = self.draw_text_object.get_obj_attr_data();
