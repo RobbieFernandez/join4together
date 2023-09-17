@@ -7,6 +7,7 @@ use graphics::sprite::OBJ_PALETTE;
 use screens::ScreenState;
 use system::gba::GBA;
 
+pub mod audio;
 pub mod graphics;
 pub mod screens;
 pub mod system;

@@ -42,7 +42,7 @@ pub struct AnimationController<'a, const C: usize> {
 pub struct LoadedObjectEntry<'a> {
     slot: ClaimedVolAddress<'a, ObjAttr, Safe, Safe, 128>,
     obj_attr: ObjAttr,
-    sprite: &'a LoadedSprite<'a>
+    sprite: &'a LoadedSprite<'a>,
 }
 
 impl Sprite {
@@ -81,7 +81,11 @@ impl<'a> LoadedSprite<'a> {
     pub fn create_obj_attr_entry(&'a self, gba: &'a GBA) -> LoadedObjectEntry<'a> {
         let slot = gba.obj_attr_memory.request_slot().expect("Out of OBJRAM");
         let oa = ObjAttr::new();
-        let mut entry = LoadedObjectEntry { slot, obj_attr: oa, sprite: self };
+        let mut entry = LoadedObjectEntry {
+            slot,
+            obj_attr: oa,
+            sprite: self,
+        };
 
         self.store_in_obj_entry(&mut entry);
 

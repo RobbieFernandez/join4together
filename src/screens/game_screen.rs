@@ -3,12 +3,13 @@ use core::cmp::min;
 use self::cpu_face::CpuFace;
 
 use super::{Screen, ScreenState};
+use crate::audio::noise;
 use crate::graphics::background::{LoadedBackground, BOARD_BACKGROUND};
 use crate::graphics::effects::Blinker;
 use crate::graphics::sprite::{
     AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite, BOARD_SLOT_SPRITE,
-    CPU_TEXT_SPRITE, P1_TEXT_SPRITE, P2_TEXT_SPRITE, RED_TOKEN_ANIMATION, WINS_TEXT_RED_SPRITE,
-    WINS_TEXT_YELLOW_SPRITE, YELLOW_TOKEN_ANIMATION, DRAW_TEXT_SPRITE,
+    CPU_TEXT_SPRITE, DRAW_TEXT_SPRITE, P1_TEXT_SPRITE, P2_TEXT_SPRITE, RED_TOKEN_ANIMATION,
+    WINS_TEXT_RED_SPRITE, WINS_TEXT_YELLOW_SPRITE, YELLOW_TOKEN_ANIMATION,
 };
 use crate::system::constants::SCREEN_WIDTH;
 use crate::system::{constants::BOARD_SLOTS, gba::GBA};
@@ -49,13 +50,13 @@ pub enum TokenColor {
 #[derive(Clone)]
 struct Winner {
     token_positions: WinningPositions,
-    blinker: Blinker
+    blinker: Blinker,
 }
 
 #[derive(Clone)]
 enum GameOutcome {
     Winner(Winner),
-    Draw
+    Draw,
 }
 
 #[derive(Clone)]
@@ -69,7 +70,6 @@ struct TokenDroppingState {
     speed: i16,
     num_bounces: i16,
 }
-
 
 #[derive(Clone)]
 enum GameState {
@@ -93,7 +93,7 @@ pub struct GameScreen<'a> {
     cpu_text_object: LoadedObjectEntry<'a>,
     red_wins_text_object: LoadedObjectEntry<'a>,
     yellow_wins_text_object: LoadedObjectEntry<'a>,
-    draw_text_object: LoadedObjectEntry<'a>
+    draw_text_object: LoadedObjectEntry<'a>,
 }
 
 pub struct GameScreenLoadedData<'a> {
@@ -105,7 +105,7 @@ pub struct GameScreenLoadedData<'a> {
     cpu_text_sprite: LoadedSprite<'a>,
     red_wins_text_sprite: LoadedSprite<'a>,
     yellow_wins_text_sprite: LoadedSprite<'a>,
-    draw_text_sprite: LoadedSprite<'a>
+    draw_text_sprite: LoadedSprite<'a>,
 }
 
 impl<'a> GameScreenLoadedData<'a> {
@@ -122,6 +122,8 @@ impl<'a> GameScreenLoadedData<'a> {
 
         let draw_text_sprite = DRAW_TEXT_SPRITE.load(gba);
 
+        noise::enable_noise();
+
         Self {
             yellow_token_animation,
             red_token_animation,
@@ -131,7 +133,7 @@ impl<'a> GameScreenLoadedData<'a> {
             cpu_text_sprite,
             red_wins_text_sprite,
             yellow_wins_text_sprite,
-            draw_text_sprite
+            draw_text_sprite,
         }
     }
 }
@@ -222,7 +224,7 @@ impl<'a> GameScreen<'a> {
             cpu_text_object,
             red_wins_text_object,
             yellow_wins_text_object,
-            draw_text_object
+            draw_text_object,
         }
     }
 
@@ -317,13 +319,15 @@ impl<'a> GameScreen<'a> {
                     }
                     None => {
                         if self.game_board.is_full() {
-                            Some(self.get_draw_game_state())                            
+                            Some(self.get_draw_game_state())
                         } else {
                             Some(GameState::TurnState(state.token_color.opposite()))
                         }
                     }
                 }
             } else {
+                noise::play_impact_noise();
+
                 state.num_bounces += 1;
                 state.speed = bounce_speed;
 
@@ -378,13 +382,11 @@ impl<'a> GameScreen<'a> {
             WINNING_TOKEN_BLINK_TIME_OFF,
             false,
         );
-        
-        let outcome = GameOutcome::Winner(
-            Winner {
-                token_positions: winning_token_positions,
-                blinker
-            }
-        );
+
+        let outcome = GameOutcome::Winner(Winner {
+            token_positions: winning_token_positions,
+            blinker,
+        });
 
         // If the losing player is a CPU, then he becomes sad :(
         let losing_color = winning_color.opposite();
@@ -407,20 +409,29 @@ impl<'a> GameScreen<'a> {
 
         let wins_text_obj = match winning_color {
             TokenColor::Red => &mut self.red_wins_text_object,
-            TokenColor::Yellow => &mut self.yellow_wins_text_object
+            TokenColor::Yellow => &mut self.yellow_wins_text_object,
         };
 
-        let player_name_width: u16 = winning_player_obj.loaded_sprite().sprite().width().try_into().unwrap();
-        let wins_text_width: u16 = wins_text_obj.loaded_sprite().sprite().width().try_into().unwrap();
+        let player_name_width: u16 = winning_player_obj
+            .loaded_sprite()
+            .sprite()
+            .width()
+            .try_into()
+            .unwrap();
+        let wins_text_width: u16 = wins_text_obj
+            .loaded_sprite()
+            .sprite()
+            .width()
+            .try_into()
+            .unwrap();
         let total_width = player_name_width + wins_text_width + WIN_TEXT_WORD_SPACING;
 
-        let player_text_xpos = SCREEN_WIDTH / 2 - total_width / 2; 
+        let player_text_xpos = SCREEN_WIDTH / 2 - total_width / 2;
         let oa = winning_player_obj.get_obj_attr_data();
         oa.set_x(player_text_xpos);
         oa.set_y(WIN_TEXT_YPOS);
         oa.set_style(ObjDisplayStyle::Normal);
         winning_player_obj.commit_to_memory();
-
 
         let wins_text_xpos = player_text_xpos + player_name_width + WIN_TEXT_WORD_SPACING;
         let oa = wins_text_obj.get_obj_attr_data();
@@ -428,7 +439,6 @@ impl<'a> GameScreen<'a> {
         oa.set_y(WIN_TEXT_YPOS);
         oa.set_style(ObjDisplayStyle::Normal);
         wins_text_obj.commit_to_memory();
-        
 
         GameState::GameOver(outcome)
     }
@@ -436,7 +446,13 @@ impl<'a> GameScreen<'a> {
     fn get_draw_game_state(&mut self) -> GameState {
         let outcome = GameOutcome::Draw;
 
-        let draw_text_width: u16 = self.draw_text_object.loaded_sprite().sprite().width().try_into().unwrap();
+        let draw_text_width: u16 = self
+            .draw_text_object
+            .loaded_sprite()
+            .sprite()
+            .width()
+            .try_into()
+            .unwrap();
 
         for color in [TokenColor::Yellow, TokenColor::Red] {
             let agent = self.get_agent(color);
@@ -445,13 +461,12 @@ impl<'a> GameScreen<'a> {
             }
         }
 
-        let x_pos = (SCREEN_WIDTH - draw_text_width) / 2; 
+        let x_pos = (SCREEN_WIDTH - draw_text_width) / 2;
         let oa = self.draw_text_object.get_obj_attr_data();
         oa.set_x(x_pos);
         oa.set_y(WIN_TEXT_YPOS);
         oa.set_style(ObjDisplayStyle::Normal);
         self.draw_text_object.commit_to_memory();
-
 
         GameState::GameOver(outcome)
     }
