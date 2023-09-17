@@ -165,6 +165,10 @@ impl<'a> GameBoard<'a> {
         &mut self.token_objects[index]
     }
 
+    pub fn is_full(&self) -> bool {
+        self.matrix.iter().all(|i| i.is_some())
+    }
+
     fn add_token_obj(&mut self, token_color: TokenColor, col: usize, row: usize) -> usize {
         let cell_index = self.calculate_index(col, row);
 

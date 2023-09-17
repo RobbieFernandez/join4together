@@ -22,7 +22,7 @@ use super::{
 };
 
 const MENU_TEXT_Y: u16 = 140;
-const MENU_TEXT_HORIZ_MARGIN: u16 = 8;
+const MENU_TEXT_HORIZ_MARGIN: u16 = 12;
 const CURSOR_X_OFFSET: u16 = 10;
 
 const BLINK_TIME_ON: u32 = 40;

@@ -8,7 +8,7 @@ use crate::graphics::effects::Blinker;
 use crate::graphics::sprite::{
     AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite, BOARD_SLOT_SPRITE,
     CPU_TEXT_SPRITE, P1_TEXT_SPRITE, P2_TEXT_SPRITE, RED_TOKEN_ANIMATION, WINS_TEXT_RED_SPRITE,
-    WINS_TEXT_YELLOW_SPRITE, YELLOW_TOKEN_ANIMATION,
+    WINS_TEXT_YELLOW_SPRITE, YELLOW_TOKEN_ANIMATION, DRAW_TEXT_SPRITE,
 };
 use crate::system::constants::SCREEN_WIDTH;
 use crate::system::{constants::BOARD_SLOTS, gba::GBA};
@@ -47,6 +47,18 @@ pub enum TokenColor {
 }
 
 #[derive(Clone)]
+struct Winner {
+    token_positions: WinningPositions,
+    blinker: Blinker
+}
+
+#[derive(Clone)]
+enum GameOutcome {
+    Winner(Winner),
+    Draw
+}
+
+#[derive(Clone)]
 struct TokenDroppingState {
     token_color: TokenColor,
     column: usize,
@@ -58,18 +70,12 @@ struct TokenDroppingState {
     num_bounces: i16,
 }
 
-#[derive(Clone)]
-struct GameOverState {
-    winning_color: Option<TokenColor>,
-    winning_token_positions: Option<WinningPositions>,
-    blinker: Blinker,
-}
 
 #[derive(Clone)]
 enum GameState {
     TurnState(TokenColor),
     TokenDropping(TokenDroppingState),
-    GameOver(GameOverState),
+    GameOver(GameOutcome),
 }
 
 pub struct GameScreen<'a> {
@@ -87,6 +93,7 @@ pub struct GameScreen<'a> {
     cpu_text_object: LoadedObjectEntry<'a>,
     red_wins_text_object: LoadedObjectEntry<'a>,
     yellow_wins_text_object: LoadedObjectEntry<'a>,
+    draw_text_object: LoadedObjectEntry<'a>
 }
 
 pub struct GameScreenLoadedData<'a> {
@@ -98,6 +105,7 @@ pub struct GameScreenLoadedData<'a> {
     cpu_text_sprite: LoadedSprite<'a>,
     red_wins_text_sprite: LoadedSprite<'a>,
     yellow_wins_text_sprite: LoadedSprite<'a>,
+    draw_text_sprite: LoadedSprite<'a>
 }
 
 impl<'a> GameScreenLoadedData<'a> {
@@ -112,6 +120,8 @@ impl<'a> GameScreenLoadedData<'a> {
         let red_wins_text_sprite = WINS_TEXT_RED_SPRITE.load(gba);
         let yellow_wins_text_sprite = WINS_TEXT_YELLOW_SPRITE.load(gba);
 
+        let draw_text_sprite = DRAW_TEXT_SPRITE.load(gba);
+
         Self {
             yellow_token_animation,
             red_token_animation,
@@ -121,6 +131,7 @@ impl<'a> GameScreenLoadedData<'a> {
             cpu_text_sprite,
             red_wins_text_sprite,
             yellow_wins_text_sprite,
+            draw_text_sprite
         }
     }
 }
@@ -194,6 +205,8 @@ impl<'a> GameScreen<'a> {
             .yellow_wins_text_sprite
             .create_obj_attr_entry(gba);
 
+        let draw_text_object = loaded_data.draw_text_sprite.create_obj_attr_entry(gba);
+
         Self {
             gba,
             red_token_animation_controller,
@@ -209,6 +222,7 @@ impl<'a> GameScreen<'a> {
             cpu_text_object,
             red_wins_text_object,
             yellow_wins_text_object,
+            draw_text_object
         }
     }
 
@@ -301,7 +315,13 @@ impl<'a> GameScreen<'a> {
                             self.get_player_winning_state(state.token_color, winning_positions);
                         Some(new_state)
                     }
-                    None => Some(GameState::TurnState(state.token_color.opposite())),
+                    None => {
+                        if self.game_board.is_full() {
+                            Some(self.get_draw_game_state())                            
+                        } else {
+                            Some(GameState::TurnState(state.token_color.opposite()))
+                        }
+                    }
                 }
             } else {
                 state.num_bounces += 1;
@@ -328,13 +348,12 @@ impl<'a> GameScreen<'a> {
         }
     }
 
-    fn update_game_over(&mut self, state: &mut GameOverState) -> Option<GameState> {
-        state.blinker.update();
-
-        if let Some(winning_positions) = state.winning_token_positions {
-            for i in winning_positions {
+    fn update_game_over(&mut self, outcome: &mut GameOutcome) -> Option<GameState> {
+        if let GameOutcome::Winner(winner) = outcome {
+            winner.blinker.update();
+            for i in winner.token_positions {
                 let mut token_obj = self.game_board.get_token_obj_entry_mut(i).as_mut().unwrap();
-                state.blinker.apply_to_object(&mut token_obj);
+                winner.blinker.apply_to_object(&mut token_obj);
                 token_obj.commit_to_memory();
             }
         }
@@ -359,12 +378,13 @@ impl<'a> GameScreen<'a> {
             WINNING_TOKEN_BLINK_TIME_OFF,
             false,
         );
-
-        let game_over_state = GameOverState {
-            blinker,
-            winning_color: Some(winning_color),
-            winning_token_positions: Some(winning_token_positions),
-        };
+        
+        let outcome = GameOutcome::Winner(
+            Winner {
+                token_positions: winning_token_positions,
+                blinker
+            }
+        );
 
         // If the losing player is a CPU, then he becomes sad :(
         let losing_color = winning_color.opposite();
@@ -410,7 +430,25 @@ impl<'a> GameScreen<'a> {
         wins_text_obj.commit_to_memory();
         
 
-        GameState::GameOver(game_over_state)
+        GameState::GameOver(outcome)
+    }
+
+    fn get_draw_game_state(&mut self) -> GameState {
+        let outcome = GameOutcome::Draw;
+
+        // TODO - Make cpu shocked.
+
+        let draw_text_width: u16 = self.draw_text_object.loaded_sprite().sprite().width().try_into().unwrap();
+
+        let x_pos = (SCREEN_WIDTH - draw_text_width) / 2; 
+        let oa = self.draw_text_object.get_obj_attr_data();
+        oa.set_x(x_pos);
+        oa.set_y(WIN_TEXT_YPOS);
+        oa.set_style(ObjDisplayStyle::Normal);
+        self.draw_text_object.commit_to_memory();
+
+
+        GameState::GameOver(outcome)
     }
 }
 
