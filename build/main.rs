@@ -8,6 +8,7 @@ use crate::sprites::find_sprites;
 mod backgrounds;
 mod binpack;
 mod grid;
+mod math;
 mod palette;
 mod sprites;
 mod tiles;
@@ -36,6 +37,12 @@ fn main() {
     let background_source = get_background_source(background_dir);
     let background_output_file = output_dir.join(Path::new("background_data.rs"));
     write_source(&background_source, &background_output_file);
+
+    // Generate LUT source code.
+    let lut_src = math::generate_lookup_table_src();
+    let lut_output_file = output_dir.join(Path::new("lut_data.rs"));
+
+    write_source(&lut_src, &lut_output_file);
 }
 
 fn get_sprite_source(sprite_dir: &Path) -> String {

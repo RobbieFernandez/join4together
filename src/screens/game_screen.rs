@@ -5,7 +5,7 @@ use self::cpu_face::CpuFace;
 use super::{Screen, ScreenState};
 use crate::audio::noise;
 use crate::graphics::background::{LoadedBackground, BOARD_BACKGROUND};
-use crate::graphics::effects::Blinker;
+use crate::graphics::effects::blinker::Blinker;
 use crate::graphics::sprite::{
     AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite, BOARD_SLOT_SPRITE,
     CPU_TEXT_SPRITE, DRAW_TEXT_SPRITE, P1_TEXT_SPRITE, P2_TEXT_SPRITE, RED_TOKEN_ANIMATION,
@@ -178,6 +178,7 @@ impl<'a> GameScreen<'a> {
         loaded_data: &'a GameScreenLoadedData<'a>,
         red_agent: Agent<'a>,
         yellow_agent: Agent<'a>,
+        starting_color: TokenColor,
     ) -> Self {
         let red_token_animation_controller = loaded_data.red_token_animation.create_controller(gba);
         let yellow_token_animation_controller =
@@ -188,8 +189,7 @@ impl<'a> GameScreen<'a> {
         let _board_slot_objects =
             game_board::create_board_object_entries(&loaded_data.board_slot_sprite, gba);
 
-        // For now hardcode red player goes first.
-        let game_state = GameState::TurnState(TokenColor::Red);
+        let game_state = GameState::TurnState(starting_color);
 
         let game_board = game_board::GameBoard::new(
             gba,

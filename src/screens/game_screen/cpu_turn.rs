@@ -1,4 +1,4 @@
-use core::cmp::{Ordering, max};
+use core::cmp::{max, Ordering};
 
 use gba::prelude::TIMER3_COUNT;
 use gba::random::{Gen32, Lcg32};
@@ -210,24 +210,26 @@ impl DecidingState {
         // Otherwise fall back to heuristic:
         //  Go through each neighbour, atwiend check for any lines it contributes to.
         //  Lines of the opponent's color are worth twice as much as lines of the player's color.
-        //  The final score will be the  maximum weighted line from all possible directions. 
-        game_board::DIRECTIONS.iter().map(|direction| {
-            let my_color_length: i32 = game_board.get_connected_positions(
-                column_number, 
-                row, 
-                direction, 
-                token_color
-            ).1.try_into().unwrap();
+        //  The final score will be the  maximum weighted line from all possible directions.
+        game_board::DIRECTIONS
+            .iter()
+            .map(|direction| {
+                let my_color_length: i32 = game_board
+                    .get_connected_positions(column_number, row, direction, token_color)
+                    .1
+                    .try_into()
+                    .unwrap();
 
-            let opposite_color_length: i32 = game_board.get_connected_positions(
-                column_number, 
-                row, 
-                direction, 
-                token_color.opposite()
-            ).1.try_into().unwrap();
+                let opposite_color_length: i32 = game_board
+                    .get_connected_positions(column_number, row, direction, token_color.opposite())
+                    .1
+                    .try_into()
+                    .unwrap();
 
-            max(my_color_length, 2 * opposite_color_length)
-        }).max().unwrap()
+                max(my_color_length, 2 * opposite_color_length)
+            })
+            .max()
+            .unwrap()
     }
 
     fn player_has_winning_move(

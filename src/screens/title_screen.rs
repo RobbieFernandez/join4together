@@ -3,7 +3,7 @@ use gba::prelude::ObjDisplayStyle;
 use crate::{
     graphics::{
         background::{LoadedBackground, TITLE_SCREEN_BACKGROUND},
-        effects::Blinker,
+        effects::blinker::Blinker,
         sprite::{
             AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite,
             MENU_CURSOR_ANIMATION, PRESS_TEXT_SPRITE, START_TEXT_SPRITE, VS_CPU_TEXT_SPRITE,
@@ -231,8 +231,8 @@ impl<'a> TitleScreen<'a> {
 
         if transition_state.timer == 0 {
             match transition_state.game_mode {
-                MenuEntry::VsCpu => Some(ScreenState::VsCpuScreen),
-                MenuEntry::VsPlayer => Some(ScreenState::VsPlayerScreen),
+                MenuEntry::VsCpu => Some(ScreenState::VsCpuSpinnerScreen),
+                MenuEntry::VsPlayer => Some(ScreenState::VsPlayerSpinnerScreen),
             }
         } else {
             self.state = TitleScreenState::GameTransition(transition_state);

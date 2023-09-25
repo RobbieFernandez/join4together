@@ -1,10 +1,6 @@
 use gba::{
-    prelude::{
-        LEFT_RIGHT_VOLUME, NOISE_FREQ, NOISE_LEN_ENV,
-    },
-    sound::{
-        LeftRightVolume, NoiseFrequency, NoiseLenEnvelope, 
-    },
+    prelude::{LEFT_RIGHT_VOLUME, NOISE_FREQ, NOISE_LEN_ENV},
+    sound::{LeftRightVolume, NoiseFrequency, NoiseLenEnvelope},
 };
 
 pub fn enable_noise() {

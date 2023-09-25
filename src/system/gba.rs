@@ -1,3 +1,5 @@
+use core::mem::size_of;
+
 use super::memory::block::MemoryBlockManager;
 use super::memory::series::MemorySeriesManager;
 use super::memory::strided_grid::MemoryStridedGridManager;
@@ -14,6 +16,8 @@ pub type ObjTileMemory = MemoryBlockManager<Tile4, Safe, Safe, 1024>;
 pub type CharblockMemory = MemoryBlockManager<Tile4, Safe, Safe, 512>;
 pub type ScreenblockMemory =
     MemoryStridedGridManager<TextEntry, Safe, Safe, 32, 32, 32, SCREENBLOCK_INDEX_OFFSET>;
+pub type AffineObjectMatrixMemory =
+    MemorySeriesManager<i16fx8, Safe, Safe, 32, { size_of::<[u16; 16]>() }>;
 
 static GBA_TAKEN: GbaCell<bool> = GbaCell::new(false);
 static PREV_INPUT_STATE: GbaCell<KeyInput> = GbaCell::new(KeyInput::new());
@@ -28,6 +32,7 @@ pub struct GBA {
     pub obj_tile_memory: ObjTileMemory,
     pub charblock_memory: CharblockMemory,
     pub screenblock_memory: ScreenblockMemory,
+    pub affine_object_matrix_memory: AffineObjectMatrixMemory,
 }
 
 pub enum GbaKey {
@@ -73,6 +78,11 @@ impl GBA {
             // too many screenblocks (which we don't for this game).
             charblock_memory: CharblockMemory::new(CHARBLOCK3_4BPP),
             screenblock_memory: ScreenblockMemory::new(TEXT_SCREENBLOCKS),
+
+            // The gba crate has separate entries for each of the matrix params.
+            // To make this memory still be dynamic, we'll just have param a be managed
+            // and then whenver we own param A, we will manually get the corresponding B, C and D entries.
+            affine_object_matrix_memory: AffineObjectMatrixMemory::new(AFFINE_PARAM_A),
         };
         gba.init();
         gba
@@ -112,6 +122,7 @@ impl GBA {
 
         // We will start TIMER 3 to be used only for seeding RNG
         TIMER3_CONTROL.write(TimerControl::new().with_enabled(true));
+        TIMER3_RELOAD.write(0x0000);
 
         // Turn on the sound chip.
         SOUND_ENABLED.write(SoundEnable::new().with_enabled(true));

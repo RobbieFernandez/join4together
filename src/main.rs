@@ -9,6 +9,7 @@ use system::gba::GBA;
 
 pub mod audio;
 pub mod graphics;
+pub mod math;
 pub mod screens;
 pub mod system;
 

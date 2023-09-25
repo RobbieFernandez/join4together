@@ -5,6 +5,7 @@ use gba::video::{
 
 use voladdress::Safe;
 
+use super::affine::AffineMatrix;
 use crate::system::gba::{ClaimedVolAddress, ClaimedVolRegion, GBA};
 
 pub struct Sprite {
@@ -43,6 +44,11 @@ pub struct LoadedObjectEntry<'a> {
     slot: ClaimedVolAddress<'a, ObjAttr, Safe, Safe, 128>,
     obj_attr: ObjAttr,
     sprite: &'a LoadedSprite<'a>,
+}
+
+pub struct AffineLoadedObjectEntry<'a> {
+    loaded_object_entry: LoadedObjectEntry<'a>,
+    affine_matrix: AffineMatrix<'a>,
 }
 
 impl Sprite {
@@ -116,6 +122,47 @@ impl<'a> LoadedObjectEntry<'a> {
 
     pub fn loaded_sprite(&'a self) -> &'a LoadedSprite {
         self.sprite
+    }
+
+    pub fn into_affine(mut self, gba: &'a GBA) -> AffineLoadedObjectEntry<'a> {
+        let affine_matrix = AffineMatrix::new(gba);
+
+        let oa_data = self.get_obj_attr_data();
+        oa_data.set_style(ObjDisplayStyle::DoubleSizeAffine);
+        oa_data.1 = oa_data.1.with_affine_index(affine_matrix.index());
+
+        AffineLoadedObjectEntry {
+            loaded_object_entry: self,
+            affine_matrix,
+        }
+    }
+}
+
+impl<'a> AffineLoadedObjectEntry<'a> {
+    pub fn into_normal_object_entry(self) -> LoadedObjectEntry<'a> {
+        self.loaded_object_entry
+    }
+
+    pub fn get_affine_matrix<'b>(&'b mut self) -> &'b mut AffineMatrix<'a>
+    where
+        'a: 'b,
+    {
+        &mut self.affine_matrix
+    }
+
+    pub fn commit_to_memory(&mut self) {
+        self.loaded_object_entry
+            .slot
+            .as_vol_address()
+            .write(self.loaded_object_entry.obj_attr);
+    }
+
+    pub fn get_obj_attr_data(&mut self) -> &mut ObjAttr {
+        &mut self.loaded_object_entry.obj_attr
+    }
+
+    pub fn loaded_sprite(&'a self) -> &'a LoadedSprite {
+        self.loaded_object_entry.sprite
     }
 }
 
