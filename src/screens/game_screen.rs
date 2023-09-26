@@ -4,7 +4,7 @@ use self::cpu_face::CpuFace;
 
 use super::{Screen, ScreenState};
 use crate::audio::noise;
-use crate::graphics::background::{LoadedBackground, BOARD_BACKGROUND};
+use crate::graphics::background::{BackgroundLayer, LoadedBackground, BOARD_BACKGROUND};
 use crate::graphics::effects::blinker::Blinker;
 use crate::graphics::sprite::{
     AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite, BOARD_SLOT_SPRITE,
@@ -197,7 +197,7 @@ impl<'a> GameScreen<'a> {
             loaded_data.yellow_token_animation.get_frame(0),
         );
 
-        let _background = BOARD_BACKGROUND.load(gba);
+        let _background = BOARD_BACKGROUND.load(gba, BackgroundLayer::Bg0);
 
         let p1_text_object = loaded_data.p1_text_sprite.create_obj_attr_entry(gba);
         let p2_text_object = loaded_data.p2_text_sprite.create_obj_attr_entry(gba);

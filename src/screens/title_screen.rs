@@ -2,8 +2,10 @@ use gba::prelude::ObjDisplayStyle;
 
 use crate::{
     graphics::{
-        background::{LoadedBackground, TITLE_SCREEN_BACKGROUND},
-        effects::blinker::Blinker,
+        background::{
+            BackgroundLayer, LoadedBackground, SCROLLER_BACKGROUND, TITLE_SCREEN_BACKGROUND,
+        },
+        effects::{background_scroller::BackgroundScroller, blinker::Blinker},
         sprite::{
             AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite,
             MENU_CURSOR_ANIMATION, PRESS_TEXT_SPRITE, START_TEXT_SPRITE, VS_CPU_TEXT_SPRITE,
@@ -67,9 +69,11 @@ pub struct TitleScreen<'a> {
     vs_cpu_text_object: LoadedObjectEntry<'a>,
     vs_player_text_object: LoadedObjectEntry<'a>,
     cursor_animation_controller: AnimationController<'a, 5>,
-    _background: LoadedBackground<'a>,
+    scrolling_background: LoadedBackground<'a>,
+    _logo_background: LoadedBackground<'a>,
     state: TitleScreenState,
     cpu_face: CpuFace<'a>,
+    background_scroller: BackgroundScroller,
 }
 
 pub struct TitleScreenLoadedData<'a> {
@@ -113,7 +117,9 @@ impl<'a> TitleScreenLoadedData<'a> {
 
 impl<'a> TitleScreen<'a> {
     pub fn new(gba: &'a GBA, loaded_data: &'a TitleScreenLoadedData<'a>) -> Self {
-        let background = TITLE_SCREEN_BACKGROUND.load(gba);
+        let logo_background = TITLE_SCREEN_BACKGROUND.load(gba, BackgroundLayer::Bg1);
+        let scrolling_background = SCROLLER_BACKGROUND.load(gba, BackgroundLayer::Bg0);
+
         let mut press_text_object = loaded_data.press_text_sprite.create_obj_attr_entry(gba);
 
         let press_oa = press_text_object.get_obj_attr_data();
@@ -178,6 +184,8 @@ impl<'a> TitleScreen<'a> {
         cpu_face.set_x(CPU_HEAD_POS.0);
         cpu_face.set_y(CPU_HEAD_POS.1);
 
+        let background_scroller = BackgroundScroller::new(0, 1);
+
         Self {
             gba,
             press_text_object,
@@ -187,7 +195,9 @@ impl<'a> TitleScreen<'a> {
             vs_player_text_object,
             cursor_animation_controller,
             cpu_face,
-            _background: background,
+            scrolling_background,
+            background_scroller,
+            _logo_background: logo_background,
         }
     }
 
@@ -323,6 +333,11 @@ impl<'a> TitleScreen<'a> {
 
 impl<'a> Screen for TitleScreen<'a> {
     fn update(&mut self) -> Option<ScreenState> {
+        self.background_scroller.update();
+
+        self.background_scroller
+            .apply_to_background(&self.scrolling_background);
+
         match self.get_state() {
             TitleScreenState::PressStart(state) => {
                 self.update_press_start(state);

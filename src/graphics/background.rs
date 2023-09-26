@@ -1,8 +1,8 @@
 use gba::{
-    prelude::{BG0CNT, DISPCNT, SCREENBLOCK_INDEX_OFFSET},
-    video::{BackgroundControl, Color, TextEntry, Tile4},
+    mmio::*,
+    video::{BackgroundControl, Color, DisplayControl, TextEntry, Tile4},
 };
-use voladdress::Safe;
+use voladdress::{Safe, VolAddress};
 
 use crate::system::{
     constants,
@@ -19,6 +19,14 @@ pub enum BackgroundSize {
     Bg64x64,
 }
 
+#[derive(Copy, Clone)]
+pub enum BackgroundLayer {
+    Bg0,
+    Bg1,
+    Bg2,
+    Bg3,
+}
+
 pub struct Background {
     tileset: &'static [Tile4],
     tilemap: &'static [TextEntry],
@@ -33,7 +41,10 @@ pub struct LoadedBackground<'a> {
     // Memory for the tilemap
     screenblock_memory:
         ClaimedGridFrames<'a, TextEntry, Safe, Safe, 32, 32, 32, SCREENBLOCK_INDEX_OFFSET>,
+    // Memory for the palette
+    _palette_memory: ClaimedVolRegion<'a, Color, Safe, Safe, 256>,
     palette_bank: u16,
+    layer: BackgroundLayer,
 }
 
 impl From<&BackgroundSize> for u16 {
@@ -77,14 +88,74 @@ impl BackgroundSize {
     }
 }
 
+impl BackgroundLayer {
+    pub fn get_horizontal_scroll_register(&self) -> VolAddress<u16, (), Safe> {
+        match self {
+            BackgroundLayer::Bg0 => BG0HOFS,
+            BackgroundLayer::Bg1 => BG1HOFS,
+            BackgroundLayer::Bg2 => BG2HOFS,
+            BackgroundLayer::Bg3 => BG3HOFS,
+        }
+    }
+
+    pub fn get_vertical_scroll_register(&self) -> VolAddress<u16, (), Safe> {
+        match self {
+            BackgroundLayer::Bg0 => BG0VOFS,
+            BackgroundLayer::Bg1 => BG1VOFS,
+            BackgroundLayer::Bg2 => BG2VOFS,
+            BackgroundLayer::Bg3 => BG3VOFS,
+        }
+    }
+
+    fn get_priority(&self) -> u16 {
+        match self {
+            BackgroundLayer::Bg0 => 3,
+            BackgroundLayer::Bg1 => 2,
+            BackgroundLayer::Bg2 => 1,
+            BackgroundLayer::Bg3 => 0,
+        }
+    }
+
+    fn get_display_control_register(&self) -> VolAddress<BackgroundControl, Safe, Safe> {
+        match self {
+            BackgroundLayer::Bg0 => BG0CNT,
+            BackgroundLayer::Bg1 => BG1CNT,
+            BackgroundLayer::Bg2 => BG2CNT,
+            BackgroundLayer::Bg3 => BG3CNT,
+        }
+    }
+
+    fn enable(&self) -> DisplayControl {
+        match self {
+            BackgroundLayer::Bg0 => DISPCNT.read().with_show_bg0(true),
+            BackgroundLayer::Bg1 => DISPCNT.read().with_show_bg1(true),
+            BackgroundLayer::Bg2 => DISPCNT.read().with_show_bg2(true),
+            BackgroundLayer::Bg3 => DISPCNT.read().with_show_bg3(true),
+        }
+    }
+
+    fn disable(&self) -> DisplayControl {
+        match self {
+            BackgroundLayer::Bg0 => DISPCNT.read().with_show_bg0(false),
+            BackgroundLayer::Bg1 => DISPCNT.read().with_show_bg1(false),
+            BackgroundLayer::Bg2 => DISPCNT.read().with_show_bg2(false),
+            BackgroundLayer::Bg3 => DISPCNT.read().with_show_bg3(false),
+        }
+    }
+}
+
 impl Background {
-    pub fn load<'a>(&'a self, gba: &'a GBA) -> LoadedBackground<'a> {
-        LoadedBackground::new(self, gba)
+    pub fn load<'a>(&'a self, gba: &'a GBA, layer: BackgroundLayer) -> LoadedBackground<'a> {
+        LoadedBackground::new(self, gba, layer)
     }
 }
 
 impl<'a> LoadedBackground<'a> {
-    fn new(background: &'a Background, gba: &'a GBA) -> Self {
+    pub fn get_layer(&self) -> BackgroundLayer {
+        self.layer
+    }
+
+    fn new(background: &'a Background, gba: &'a GBA, layer: BackgroundLayer) -> Self {
         let charblock_region = gba
             .charblock_memory
             .request_memory(background.tileset.len())
@@ -96,22 +167,26 @@ impl<'a> LoadedBackground<'a> {
             .expect("Out of screenblock memory.");
 
         // We only have 4BBP tiles, so request a palette bank.
-        let mut bg_pal_bank = gba
+        let mut palette_memory = gba
             .bg_palette_memory
-            .request_aligned_memory(16, 1)
+            .request_aligned_memory(1, 16)
             .expect("Out of BG palette memory.");
 
-        let pal_bank_number: u16 = bg_pal_bank.get_start().try_into().unwrap();
+        let pal_bank_number: u16 = palette_memory.get_start().try_into().unwrap();
+
         let pal_bank_number = pal_bank_number / 16;
 
         // Write the palette to memory.
-        let bg_pal_bank_region = bg_pal_bank.as_vol_region();
+        let bg_pal_bank_region = palette_memory.as_vol_region();
+
         for (i, color) in background.palette.iter().enumerate() {
             bg_pal_bank_region.get(i).unwrap().write(*color);
         }
 
         let mut loaded_bg = LoadedBackground {
             background,
+            layer,
+            _palette_memory: palette_memory,
             charblock_memory: charblock_region,
             screenblock_memory: screenblocks,
             palette_bank: pal_bank_number,
@@ -177,18 +252,23 @@ impl<'a> LoadedBackground<'a> {
         let bg_control = BackgroundControl::new()
             .with_bpp8(false)
             .with_screenblock(screenblock_index)
-            .with_charblock(constants::CHARBLOCK_BASE);
+            .with_charblock(constants::CHARBLOCK_BASE)
+            .with_priority(self.layer.get_priority());
 
-        BG0CNT.write(bg_control);
+        self.layer.get_display_control_register().write(bg_control);
 
-        let disp_control = DISPCNT.read().with_show_bg0(true);
+        let disp_control = self.layer.enable();
         DISPCNT.write(disp_control);
+
+        // Clear the scroll registers.
+        self.layer.get_horizontal_scroll_register().write(0);
+        self.layer.get_vertical_scroll_register().write(0);
     }
 }
 
 impl<'a> Drop for LoadedBackground<'a> {
     fn drop(&mut self) {
-        let disp_control = DISPCNT.read().with_show_bg0(false);
+        let disp_control = self.layer.disable();
         DISPCNT.write(disp_control);
     }
 }

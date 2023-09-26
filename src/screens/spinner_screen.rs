@@ -3,8 +3,8 @@ use gba::{prelude::TIMER3_COUNT, random::Lcg32};
 use crate::{
     graphics::effects::spinner::Spinner,
     graphics::{
-        background::{LoadedBackground, SPINNER_BACKGROUND},
-        effects::blinker::Blinker,
+        background::{BackgroundLayer, LoadedBackground, SCROLLER_BACKGROUND, SPINNER_BACKGROUND},
+        effects::{background_scroller::BackgroundScroller, blinker::Blinker},
         sprite::{
             AffineLoadedObjectEntry, AnimationController, LoadedAnimation, LoadedObjectEntry,
             LoadedSprite, CPU_TEXT_SPRITE, P1_TEXT_SPRITE, P2_TEXT_SPRITE, PRESS_A_ANIMATION,
@@ -55,7 +55,8 @@ pub struct SpinnerScreenLoadedData<'a> {
 pub struct SpinnerScreen<'a> {
     arrow_sprite: AffineLoadedObjectEntry<'a>,
     spinner: Spinner,
-    _background: LoadedBackground<'a>,
+    _spinner_background: LoadedBackground<'a>,
+    scrolling_background: LoadedBackground<'a>,
     state: SpinnerScreenState,
     press_a_animation_controller: AnimationController<'a, 2>,
     mode: SpinnerMode,
@@ -63,6 +64,7 @@ pub struct SpinnerScreen<'a> {
     red_player_obj: LoadedObjectEntry<'a>,
     yellow_player_obj: LoadedObjectEntry<'a>,
     blinker: Blinker,
+    background_scroller: BackgroundScroller,
 }
 
 impl<'a> SpinnerScreenLoadedData<'a> {
@@ -88,6 +90,11 @@ impl<'a> SpinnerScreenLoadedData<'a> {
 
 impl<'a> Screen for SpinnerScreen<'a> {
     fn update(&mut self) -> Option<super::ScreenState> {
+        self.background_scroller.update();
+
+        self.background_scroller
+            .apply_to_background(&self.scrolling_background);
+
         let state = self.state.clone();
 
         match state {
@@ -120,7 +127,8 @@ impl<'a> SpinnerScreen<'a> {
 
         let spinner = Spinner::new(0xFFFF, 0x000F);
 
-        let background = SPINNER_BACKGROUND.load(gba);
+        let spinner_background = SPINNER_BACKGROUND.load(gba, BackgroundLayer::Bg1);
+        let scrolling_background = SCROLLER_BACKGROUND.load(gba, BackgroundLayer::Bg0);
 
         let mut press_a_animation_controller = loaded_data.press_a_animation.create_controller(gba);
         let press_a_height: u16 = PRESS_A_FRAME_0_SPRITE.height().try_into().unwrap();
@@ -153,6 +161,7 @@ impl<'a> SpinnerScreen<'a> {
         yellow_player_obj.commit_to_memory();
 
         let blinker = Blinker::new(BLINK_TIME_ON, BLINK_TIME_OFF, false);
+        let background_scroller = BackgroundScroller::new(0, 1);
 
         Self {
             gba,
@@ -162,9 +171,11 @@ impl<'a> SpinnerScreen<'a> {
             mode,
             red_player_obj,
             yellow_player_obj,
-            state: SpinnerScreenState::PressA,
-            _background: background,
             blinker,
+            scrolling_background,
+            background_scroller,
+            state: SpinnerScreenState::PressA,
+            _spinner_background: spinner_background,
         }
     }
 

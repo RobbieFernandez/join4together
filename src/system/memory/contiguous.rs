@@ -86,17 +86,17 @@ impl<'a, const C: usize> ContiguousMemoryTracker<C> {
         alignment: usize,
         requested_aligned_chunks: usize,
     ) -> Result<FreeMemoryRange<C>, OutOfMemoryError> {
-        let mut pos = 0; // The index of the last seen aligned chunk
+        let mut chunk_pos = 0; // The index of the last seen aligned chunk
         let num_chunks = C / alignment;
         let allocation_arr = self.allocation_arr.borrow();
 
-        while pos < allocation_arr.len() {
-            let chunk_pos = pos * alignment;
-            let mut chunk_iter = allocation_arr[chunk_pos..].chunks_exact(alignment);
+        while chunk_pos < allocation_arr.len() {
+            let element_pos = chunk_pos * alignment;
+            let mut chunk_iter = allocation_arr[element_pos..].chunks_exact(alignment);
 
             // Find first chunk that contains unclaimed memory.
             let starting_chunk_index = chunk_iter
-                .position(|chunk| chunk.iter().all(|e| !e))
+                .position(|chunk| chunk.iter().all(|e| !*e))
                 .expect("Out of memory!");
 
             // Find the next chunk that contains at least 1 claimed memory address
@@ -105,12 +105,12 @@ impl<'a, const C: usize> ContiguousMemoryTracker<C> {
             // If there was no next claimed chunk found, then the free chunk lasts until
             // the end of the underlying VolBlock.
             let num_free_chunks = match next_claimed_chunk_index {
-                Some(n) => n - starting_chunk_index,
+                Some(n) => n,
                 None => num_chunks - starting_chunk_index,
             };
 
             if num_free_chunks >= requested_aligned_chunks {
-                let start_of_range = starting_chunk_index * alignment;
+                let start_of_range = (chunk_pos + starting_chunk_index) * alignment;
                 let length = requested_aligned_chunks * alignment;
 
                 return Ok(FreeMemoryRange {
@@ -120,8 +120,8 @@ impl<'a, const C: usize> ContiguousMemoryTracker<C> {
                 });
             }
 
-            pos = match next_claimed_chunk_index {
-                Some(n) => n,
+            chunk_pos = match next_claimed_chunk_index {
+                Some(next) => chunk_pos + starting_chunk_index + next,
                 None => return Err(OutOfMemoryError),
             }
         }
