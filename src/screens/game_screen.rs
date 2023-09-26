@@ -4,7 +4,12 @@ use self::cpu_face::CpuFace;
 
 use super::{Screen, ScreenState};
 use crate::audio::noise;
-use crate::graphics::background::{BackgroundLayer, LoadedBackground, BOARD_BACKGROUND};
+use crate::graphics::background::{
+    BackgroundLayer, LoadedBackground, BOARD_BACKGROUND, CLOUDS_CLOSE_BACKGROUND,
+    CLOUDS_FAR_BACKGROUND,
+};
+use crate::graphics::effects::background_scroller::BackgroundScroller;
+use crate::graphics::effects::blending::BlendController;
 use crate::graphics::effects::blinker::Blinker;
 use crate::graphics::sprite::{
     AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite, BOARD_SLOT_SPRITE,
@@ -16,6 +21,7 @@ use crate::system::{constants::BOARD_SLOTS, gba::GBA};
 use cpu_turn::CpuTurn;
 use game_board::WinningPositions;
 use gba::prelude::ObjDisplayStyle;
+use gba::video::{BlendControl, ColorEffectMode};
 use player_turn::PlayerTurn;
 
 pub mod cpu_face;
@@ -94,6 +100,11 @@ pub struct GameScreen<'a> {
     red_wins_text_object: LoadedObjectEntry<'a>,
     yellow_wins_text_object: LoadedObjectEntry<'a>,
     draw_text_object: LoadedObjectEntry<'a>,
+    clouds_background_close: LoadedBackground<'a>,
+    clouds_background_far: LoadedBackground<'a>,
+    _blend_controller: BlendController,
+    cloud_scroller_close: BackgroundScroller,
+    cloud_scroller_far: BackgroundScroller,
 }
 
 pub struct GameScreenLoadedData<'a> {
@@ -197,8 +208,6 @@ impl<'a> GameScreen<'a> {
             loaded_data.yellow_token_animation.get_frame(0),
         );
 
-        let _background = BOARD_BACKGROUND.load(gba, BackgroundLayer::Bg0);
-
         let p1_text_object = loaded_data.p1_text_sprite.create_obj_attr_entry(gba);
         let p2_text_object = loaded_data.p2_text_sprite.create_obj_attr_entry(gba);
         let cpu_text_object = loaded_data.cpu_text_sprite.create_obj_attr_entry(gba);
@@ -208,6 +217,24 @@ impl<'a> GameScreen<'a> {
             .create_obj_attr_entry(gba);
 
         let draw_text_object = loaded_data.draw_text_sprite.create_obj_attr_entry(gba);
+
+        let _background = BOARD_BACKGROUND.load(gba, BackgroundLayer::Bg0);
+        let clouds_background_far = CLOUDS_FAR_BACKGROUND.load(gba, BackgroundLayer::Bg1);
+        let clouds_background_close = CLOUDS_CLOSE_BACKGROUND.load(gba, BackgroundLayer::Bg2);
+        let mut blend_controller = BlendController::new();
+
+        // Target 1 is on top of Target 2
+        blend_controller.update(
+            BlendControl::new()
+                .with_mode(ColorEffectMode::AlphaBlend)
+                .with_target2_bg0(true)
+                .with_target1_bg1(true)
+                .with_target1_bg2(true),
+            [26, 6].into(),
+        );
+
+        let cloud_scroller_close = BackgroundScroller::new(1, 0).with_divisor(5);
+        let cloud_scroller_far = BackgroundScroller::new(1, 0).with_divisor(8);
 
         Self {
             gba,
@@ -225,6 +252,11 @@ impl<'a> GameScreen<'a> {
             red_wins_text_object,
             yellow_wins_text_object,
             draw_text_object,
+            clouds_background_close,
+            clouds_background_far,
+            cloud_scroller_close,
+            cloud_scroller_far,
+            _blend_controller: blend_controller,
         }
     }
 
@@ -483,6 +515,14 @@ impl TokenColor {
 
 impl<'a> Screen for GameScreen<'a> {
     fn update(&mut self) -> Option<ScreenState> {
+        self.cloud_scroller_close.update();
+        self.cloud_scroller_close
+            .apply_to_background(&self.clouds_background_close);
+
+        self.cloud_scroller_far.update();
+        self.cloud_scroller_far
+            .apply_to_background(&self.clouds_background_far);
+
         let mut state = self.get_state();
 
         let new_state = match state {
