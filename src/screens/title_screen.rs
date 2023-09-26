@@ -184,7 +184,7 @@ impl<'a> TitleScreen<'a> {
         cpu_face.set_x(CPU_HEAD_POS.0);
         cpu_face.set_y(CPU_HEAD_POS.1);
 
-        let background_scroller = BackgroundScroller::new(0, 1);
+        let background_scroller = BackgroundScroller::new(0, 1).with_divisor(2);
 
         Self {
             gba,

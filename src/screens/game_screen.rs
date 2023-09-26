@@ -230,7 +230,7 @@ impl<'a> GameScreen<'a> {
                 .with_target2_bg0(true)
                 .with_target1_bg1(true)
                 .with_target1_bg2(true),
-            [26, 6].into(),
+            [25, 7].into(),
         );
 
         let cloud_scroller_close = BackgroundScroller::new(1, 0).with_divisor(5);

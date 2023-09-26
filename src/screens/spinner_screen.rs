@@ -161,7 +161,7 @@ impl<'a> SpinnerScreen<'a> {
         yellow_player_obj.commit_to_memory();
 
         let blinker = Blinker::new(BLINK_TIME_ON, BLINK_TIME_OFF, false);
-        let background_scroller = BackgroundScroller::new(0, 1);
+        let background_scroller = BackgroundScroller::new(0, 1).with_divisor(2);
 
         Self {
             gba,
