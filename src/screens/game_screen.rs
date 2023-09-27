@@ -133,8 +133,6 @@ impl<'a> GameScreenLoadedData<'a> {
 
         let draw_text_sprite = DRAW_TEXT_SPRITE.load(gba);
 
-        noise::enable_noise();
-
         Self {
             yellow_token_animation,
             red_token_animation,

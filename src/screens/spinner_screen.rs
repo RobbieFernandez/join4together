@@ -1,6 +1,7 @@
 use gba::{prelude::TIMER3_COUNT, random::Lcg32};
 
 use crate::{
+    audio::drum_roll::DrumRoll,
     graphics::effects::spinner::Spinner,
     graphics::{
         background::{BackgroundLayer, LoadedBackground, SCROLLER_BACKGROUND, SPINNER_BACKGROUND},
@@ -65,6 +66,7 @@ pub struct SpinnerScreen<'a> {
     yellow_player_obj: LoadedObjectEntry<'a>,
     blinker: Blinker,
     background_scroller: BackgroundScroller,
+    drum_roll: DrumRoll,
 }
 
 impl<'a> SpinnerScreenLoadedData<'a> {
@@ -163,6 +165,8 @@ impl<'a> SpinnerScreen<'a> {
         let blinker = Blinker::new(BLINK_TIME_ON, BLINK_TIME_OFF, false);
         let background_scroller = BackgroundScroller::new(0, 1).with_divisor(2);
 
+        let drum_roll = DrumRoll::new(1);
+
         Self {
             gba,
             arrow_sprite,
@@ -174,6 +178,7 @@ impl<'a> SpinnerScreen<'a> {
             blinker,
             scrolling_background,
             background_scroller,
+            drum_roll,
             state: SpinnerScreenState::PressA,
             _spinner_background: spinner_background,
         }
@@ -205,6 +210,15 @@ impl<'a> SpinnerScreen<'a> {
         self.spinner.update();
         self.spinner.apply_to_object(&mut self.arrow_sprite);
         self.arrow_sprite.get_affine_matrix().commit_to_memory();
+
+        // The max spinning speed is 0x0FFF.
+        // We need to decrease the speed of the drums linearly as the speed drops down to zero.
+        // The drum delay counts frames so we don't want it to grow very high.
+        // The shift by 8 slows down the decay.
+        self.drum_roll.update();
+        let drum_delay = 2 + ((0x1000 - self.spinner.speed()) >> 8);
+
+        self.drum_roll.set_delay(drum_delay.into());
 
         if self.spinner.finished() {
             self.enter_finished_state();

@@ -21,6 +21,10 @@ impl Spinner {
         self.speed = speed;
     }
 
+    pub fn speed(&self) -> u16 {
+        self.speed
+    }
+
     pub fn update(&mut self) {
         self.speed = if self.speed < self.decay {
             0

@@ -1,5 +1,7 @@
 use core::mem::size_of;
 
+use crate::audio::noise::enable_noise;
+
 use super::memory::block::MemoryBlockManager;
 use super::memory::series::MemorySeriesManager;
 use super::memory::strided_grid::MemoryStridedGridManager;
@@ -126,6 +128,7 @@ impl GBA {
 
         // Turn on the sound chip.
         SOUND_ENABLED.write(SoundEnable::new().with_enabled(true));
+        enable_noise();
     }
 
     fn hide_all_objects(&mut self) {

@@ -1,6 +1,7 @@
 use gba::prelude::ObjDisplayStyle;
 
 use crate::{
+    audio::noise::play_menu_move_noise,
     graphics::{
         background::{
             BackgroundLayer, LoadedBackground, SCROLLER_BACKGROUND, TITLE_SCREEN_BACKGROUND,
@@ -223,6 +224,7 @@ impl<'a> TitleScreen<'a> {
 
     fn update_menu(&mut self, mut menu_state: MenuState) {
         if self.gba.key_was_pressed(GbaKey::LEFT) || self.gba.key_was_pressed(GbaKey::RIGHT) {
+            play_menu_move_noise();
             menu_state.cursor_position = menu_state.cursor_position.next();
         };
 
@@ -230,6 +232,7 @@ impl<'a> TitleScreen<'a> {
         self.update_cpu_expression(&menu_state);
 
         if self.gba.key_was_pressed(GbaKey::START) || self.gba.key_was_pressed(GbaKey::A) {
+            play_menu_move_noise();
             self.enter_transition(menu_state.cursor_position);
         } else {
             self.state = TitleScreenState::Menu(menu_state);
@@ -252,6 +255,8 @@ impl<'a> TitleScreen<'a> {
 
     fn enter_menu(&mut self) {
         self.hide_press_start_text();
+
+        play_menu_move_noise();
 
         let menu_state = MenuState {
             cursor_position: MenuEntry::VsCpu,
