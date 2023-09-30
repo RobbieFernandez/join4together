@@ -13,10 +13,12 @@ use crate::graphics::effects::blending::BlendController;
 use crate::graphics::effects::blinker::Blinker;
 use crate::graphics::sprite::{
     AnimationController, LoadedAnimation, LoadedObjectEntry, LoadedSprite, BOARD_SLOT_SPRITE,
-    CPU_TEXT_SPRITE, DRAW_TEXT_SPRITE, P1_TEXT_SPRITE, P2_TEXT_SPRITE, RED_TOKEN_ANIMATION,
+    CPU_TEXT_SPRITE, DRAW_TEXT_SPRITE, MENU_CURSOR_ANIMATION, MENU_CURSOR_FRAME_0_SPRITE,
+    P1_TEXT_SPRITE, P2_TEXT_SPRITE, QUIT_TEXT_SPRITE, RED_TOKEN_ANIMATION, REMATCH_TEXT_SPRITE,
     WINS_TEXT_RED_SPRITE, WINS_TEXT_YELLOW_SPRITE, YELLOW_TOKEN_ANIMATION,
 };
-use crate::system::constants::SCREEN_WIDTH;
+use crate::system::constants::{SCREEN_CENTER, SCREEN_WIDTH};
+use crate::system::gba::GbaKey;
 use crate::system::{constants::BOARD_SLOTS, gba::GBA};
 use cpu_turn::CpuTurn;
 use game_board::WinningPositions;
@@ -40,7 +42,11 @@ const WINNING_TOKEN_BLINK_TIME_ON: u32 = 22;
 const WINNING_TOKEN_BLINK_TIME_OFF: u32 = 8;
 
 const WIN_TEXT_WORD_SPACING: u16 = 4;
-const WIN_TEXT_YPOS: u16 = 11;
+const WIN_TEXT_YPOS: u16 = 5;
+
+const GAME_OVER_MENU_YPOS: u16 = 26;
+const MENU_TEXT_HORIZ_MARGIN: u16 = 10;
+const CURSOR_X_OFFSET: u16 = 10;
 
 pub enum Agent<'a> {
     Human(PlayerTurn),
@@ -66,6 +72,18 @@ enum GameOutcome {
 }
 
 #[derive(Clone)]
+enum CursorPosition {
+    Rematch,
+    Quit,
+}
+
+#[derive(Clone)]
+struct GameOverState {
+    outcome: GameOutcome,
+    cursor_position: CursorPosition,
+}
+
+#[derive(Clone)]
 struct TokenDroppingState {
     token_color: TokenColor,
     column: usize,
@@ -81,7 +99,7 @@ struct TokenDroppingState {
 enum GameState {
     TurnState(TokenColor),
     TokenDropping(TokenDroppingState),
-    GameOver(GameOutcome),
+    GameOver(GameOverState),
 }
 
 pub struct GameScreen<'a> {
@@ -105,6 +123,9 @@ pub struct GameScreen<'a> {
     _blend_controller: BlendController,
     cloud_scroller_close: BackgroundScroller,
     cloud_scroller_far: BackgroundScroller,
+    rematch_text_object: LoadedObjectEntry<'a>,
+    quit_text_object: LoadedObjectEntry<'a>,
+    menu_cursor_animation_controller: AnimationController<'a, 5>,
 }
 
 pub struct GameScreenLoadedData<'a> {
@@ -117,6 +138,9 @@ pub struct GameScreenLoadedData<'a> {
     red_wins_text_sprite: LoadedSprite<'a>,
     yellow_wins_text_sprite: LoadedSprite<'a>,
     draw_text_sprite: LoadedSprite<'a>,
+    rematch_text_sprite: LoadedSprite<'a>,
+    quit_text_sprite: LoadedSprite<'a>,
+    menu_cursor_animation: LoadedAnimation<'a, 5>,
 }
 
 impl<'a> GameScreenLoadedData<'a> {
@@ -133,6 +157,10 @@ impl<'a> GameScreenLoadedData<'a> {
 
         let draw_text_sprite = DRAW_TEXT_SPRITE.load(gba);
 
+        let rematch_text_sprite = REMATCH_TEXT_SPRITE.load(gba);
+        let quit_text_sprite = QUIT_TEXT_SPRITE.load(gba);
+        let menu_cursor_animation = MENU_CURSOR_ANIMATION.load(gba);
+
         Self {
             yellow_token_animation,
             red_token_animation,
@@ -143,6 +171,9 @@ impl<'a> GameScreenLoadedData<'a> {
             red_wins_text_sprite,
             yellow_wins_text_sprite,
             draw_text_sprite,
+            rematch_text_sprite,
+            quit_text_sprite,
+            menu_cursor_animation,
         }
     }
 }
@@ -234,6 +265,11 @@ impl<'a> GameScreen<'a> {
         let cloud_scroller_close = BackgroundScroller::new(1, 0).with_divisor(5);
         let cloud_scroller_far = BackgroundScroller::new(1, 0).with_divisor(8);
 
+        let rematch_text_object = loaded_data.rematch_text_sprite.create_obj_attr_entry(gba);
+        let quit_text_object = loaded_data.quit_text_sprite.create_obj_attr_entry(gba);
+        let menu_cursor_animation_controller =
+            loaded_data.menu_cursor_animation.create_controller(gba);
+
         Self {
             gba,
             red_token_animation_controller,
@@ -254,6 +290,9 @@ impl<'a> GameScreen<'a> {
             clouds_background_far,
             cloud_scroller_close,
             cloud_scroller_far,
+            rematch_text_object,
+            quit_text_object,
+            menu_cursor_animation_controller,
             _blend_controller: blend_controller,
         }
     }
@@ -382,8 +421,8 @@ impl<'a> GameScreen<'a> {
         }
     }
 
-    fn update_game_over(&mut self, outcome: &mut GameOutcome) -> Option<GameState> {
-        if let GameOutcome::Winner(winner) = outcome {
+    fn update_game_over(&mut self, game_over_state: &mut GameOverState) -> Option<ScreenState> {
+        if let GameOutcome::Winner(ref mut winner) = &mut game_over_state.outcome {
             winner.blinker.update();
             for i in winner.token_positions {
                 let mut token_obj = self.game_board.get_token_obj_entry_mut(i).as_mut().unwrap();
@@ -392,7 +431,39 @@ impl<'a> GameScreen<'a> {
             }
         }
 
+        if self.gba.key_was_pressed(GbaKey::A) || self.gba.key_was_pressed(GbaKey::START) {
+            return match game_over_state.cursor_position {
+                CursorPosition::Quit => Some(ScreenState::TitleScreen),
+                CursorPosition::Rematch => match self.yellow_agent {
+                    Agent::Cpu(_, _) => Some(ScreenState::VsCpuSpinnerScreen),
+                    Agent::Human(_) => Some(ScreenState::VsPlayerSpinnerScreen),
+                },
+            };
+        }
+
+        // Update the menu position.
+        if self.gba.key_was_pressed(GbaKey::LEFT) || self.gba.key_was_pressed(GbaKey::RIGHT) {
+            game_over_state.cursor_position = game_over_state.cursor_position.next();
+        }
+
+        self.update_cursor_object(&game_over_state.cursor_position);
+
         None
+    }
+
+    fn update_cursor_object(&mut self, position: &CursorPosition) {
+        let target_obj = match position {
+            CursorPosition::Rematch => self.rematch_text_object.get_obj_attr_data(),
+            CursorPosition::Quit => self.quit_text_object.get_obj_attr_data(),
+        };
+
+        let target_obj_x = target_obj.1.x();
+        let cursor_x = target_obj_x - CURSOR_X_OFFSET;
+
+        let cursor_obj = self.menu_cursor_animation_controller.get_obj_attr_entry();
+        let cursor_oa = cursor_obj.get_obj_attr_data();
+        cursor_oa.set_x(cursor_x);
+        self.menu_cursor_animation_controller.tick();
     }
 
     fn get_agent<'b>(&'b mut self, token_color: TokenColor) -> &'b mut Agent<'a> {
@@ -470,7 +541,14 @@ impl<'a> GameScreen<'a> {
         oa.set_style(ObjDisplayStyle::Normal);
         wins_text_obj.commit_to_memory();
 
-        GameState::GameOver(outcome)
+        let game_over_state = GameOverState {
+            outcome,
+            cursor_position: CursorPosition::Rematch,
+        };
+
+        self.init_game_over_menu();
+
+        GameState::GameOver(game_over_state)
     }
 
     fn get_draw_game_state(&mut self) -> GameState {
@@ -498,7 +576,44 @@ impl<'a> GameScreen<'a> {
         oa.set_style(ObjDisplayStyle::Normal);
         self.draw_text_object.commit_to_memory();
 
-        GameState::GameOver(outcome)
+        let game_over_state = GameOverState {
+            outcome,
+            cursor_position: CursorPosition::Quit,
+        };
+
+        self.init_game_over_menu();
+
+        GameState::GameOver(game_over_state)
+    }
+
+    fn init_game_over_menu(&mut self) {
+        let rematch_oa = self.rematch_text_object.get_obj_attr_data();
+        let rematch_text_width: u16 = REMATCH_TEXT_SPRITE.width().try_into().unwrap();
+        let rematch_text_height: u16 = REMATCH_TEXT_SPRITE.height().try_into().unwrap();
+        let rematch_text_xpos = SCREEN_CENTER.0 - rematch_text_width - MENU_TEXT_HORIZ_MARGIN;
+
+        rematch_oa.set_x(rematch_text_xpos);
+        rematch_oa.set_y(GAME_OVER_MENU_YPOS);
+        self.rematch_text_object.commit_to_memory();
+
+        let rematch_x_center = rematch_text_xpos + (rematch_text_width / 2);
+        let rematch_center_offset = SCREEN_CENTER.0 - rematch_x_center;
+
+        let quit_oa = self.quit_text_object.get_obj_attr_data();
+        let quit_text_width: u16 = QUIT_TEXT_SPRITE.width().try_into().unwrap();
+        let quit_text_xpos = (SCREEN_CENTER.0 + rematch_center_offset) - (quit_text_width / 2);
+
+        quit_oa.set_x(quit_text_xpos);
+        quit_oa.set_y(GAME_OVER_MENU_YPOS);
+        self.quit_text_object.commit_to_memory();
+
+        let cursor_height: u16 = MENU_CURSOR_FRAME_0_SPRITE.height().try_into().unwrap();
+        let menu_y_center = GAME_OVER_MENU_YPOS + (rematch_text_height / 2);
+        let cursor_ypos = menu_y_center - (cursor_height / 2);
+
+        let cursor_obj = self.menu_cursor_animation_controller.get_obj_attr_entry();
+        let cursor_oa = cursor_obj.get_obj_attr_data();
+        cursor_oa.set_y(cursor_ypos);
     }
 }
 
@@ -528,7 +643,13 @@ impl<'a> Screen for GameScreen<'a> {
             GameState::TokenDropping(ref mut token_state) => {
                 self.update_token_dropping(token_state)
             }
-            GameState::GameOver(ref mut game_over_state) => self.update_game_over(game_over_state),
+            GameState::GameOver(ref mut game_over_state) => {
+                let next_screen = self.update_game_over(game_over_state);
+                if next_screen.is_some() {
+                    return next_screen;
+                }
+                None
+            }
         };
 
         if let Some(new_state) = new_state {
@@ -538,5 +659,14 @@ impl<'a> Screen for GameScreen<'a> {
         }
 
         None
+    }
+}
+
+impl CursorPosition {
+    pub fn next(&self) -> Self {
+        match self {
+            Self::Quit => Self::Rematch,
+            Self::Rematch => Self::Quit,
+        }
     }
 }
