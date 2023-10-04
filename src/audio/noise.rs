@@ -30,7 +30,7 @@ pub fn play_impact_noise() {
 
     let env = NoiseLenEnvelope::new()
         .with_step_increasing(false)
-        .with_volume(0b0100)
+        .with_volume(0b0111)
         .with_length(1)
         .with_step_time(0b001);
 
@@ -47,11 +47,11 @@ pub fn play_menu_move_noise() {
     let sweep = SweepControl::new()
         .with_sweep_increasing(false)
         .with_sweep_num(0b100)
-        .with_sweep_time(0b001);
+        .with_sweep_time(0b010);
 
     let env = TonePattern::new()
         .with_step_increasing(false)
-        .with_volume(0b1000)
+        .with_volume(0b1111)
         .with_step_time(0b001)
         .with_length(0x0001)
         .with_duty(0b10);

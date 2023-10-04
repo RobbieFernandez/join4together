@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel, TIMER1_COUNT, TIMER2_COUNT};
+use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel};
 use graphics::sprite::OBJ_PALETTE;
 
 use screens::ScreenState;
