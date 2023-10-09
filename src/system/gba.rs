@@ -1,5 +1,6 @@
 use core::mem::size_of;
 
+use crate::audio::music::MusicPlayer;
 use crate::audio::noise::enable_noise;
 
 use super::irq::init_irq;

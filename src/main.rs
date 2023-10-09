@@ -42,10 +42,10 @@ extern "C" fn main() -> ! {
 
     let mut screen_state = ScreenState::TitleScreen;
 
-    audio::music::init_music();
+    let mut music_player = audio::music::MusicPlayer::take();
 
     // Top-level game loop just runs the currently active screen until it transitions.
     loop {
-        screen_state = screen_state.exec_screen(&gba);
+        screen_state = screen_state.exec_screen(&gba, &mut music_player);
     }
 }
