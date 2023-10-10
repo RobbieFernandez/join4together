@@ -1,7 +1,7 @@
 use gba::prelude::ObjDisplayStyle;
 
 use crate::{
-    audio::noise::play_menu_move_noise,
+    audio::{mixer::AudioMixer, noise::play_menu_move_noise},
     graphics::{
         background::{
             BackgroundLayer, LoadedBackground, SCROLLER_BACKGROUND, TITLE_SCREEN_BACKGROUND,
@@ -337,7 +337,7 @@ impl<'a> TitleScreen<'a> {
 }
 
 impl<'a> Screen for TitleScreen<'a> {
-    fn update(&mut self) -> Option<ScreenState> {
+    fn update(&mut self, _mixer: &mut AudioMixer) -> Option<ScreenState> {
         self.background_scroller.update();
 
         self.background_scroller

@@ -1,3 +1,4 @@
+pub mod assets;
 pub mod drum_roll;
-pub mod music;
+pub mod mixer;
 pub mod noise;

@@ -3,7 +3,8 @@ use core::cmp::min;
 use self::cpu_face::CpuFace;
 
 use super::{Screen, ScreenState};
-use crate::audio::noise;
+use crate::audio::assets::BOUNCE_NOISE;
+use crate::audio::mixer::{AudioMixer, AudioSource, AudioVolume};
 use crate::graphics::background::{
     BackgroundLayer, LoadedBackground, BOARD_BACKGROUND, CLOUDS_CLOSE_BACKGROUND,
     CLOUDS_FAR_BACKGROUND,
@@ -353,7 +354,11 @@ impl<'a> GameScreen<'a> {
         }
     }
 
-    fn update_token_dropping(&mut self, state: &mut TokenDroppingState) -> Option<GameState> {
+    fn update_token_dropping(
+        &mut self,
+        mixer: &mut AudioMixer,
+        state: &mut TokenDroppingState,
+    ) -> Option<GameState> {
         let i_current_y: i16 = state.current_y.try_into().unwrap();
         let new_y = i_current_y + state.speed;
 
@@ -395,7 +400,9 @@ impl<'a> GameScreen<'a> {
                     }
                 }
             } else {
-                noise::play_impact_noise();
+                // noise::play_impact_noise();
+                let sound = AudioSource::new(BOUNCE_NOISE, AudioVolume::new(10), false);
+                mixer.set_channel_2(sound);
 
                 state.num_bounces += 1;
                 state.speed = bounce_speed;
@@ -627,7 +634,7 @@ impl TokenColor {
 }
 
 impl<'a> Screen for GameScreen<'a> {
-    fn update(&mut self) -> Option<ScreenState> {
+    fn update(&mut self, mixer: &mut AudioMixer) -> Option<ScreenState> {
         self.cloud_scroller_close.update();
         self.cloud_scroller_close
             .apply_to_background(&self.clouds_background_close);
@@ -641,7 +648,7 @@ impl<'a> Screen for GameScreen<'a> {
         let new_state = match state {
             GameState::TurnState(token_color) => self.update_turn(token_color),
             GameState::TokenDropping(ref mut token_state) => {
-                self.update_token_dropping(token_state)
+                self.update_token_dropping(mixer, token_state)
             }
             GameState::GameOver(ref mut game_over_state) => {
                 let next_screen = self.update_game_over(game_over_state);

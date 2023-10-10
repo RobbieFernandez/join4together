@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 
-use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel};
 use graphics::sprite::OBJ_PALETTE;
 
 use screens::ScreenState;
@@ -16,6 +15,7 @@ pub mod system;
 #[panic_handler]
 fn panic_handler(i: &core::panic::PanicInfo) -> ! {
     use core::fmt::Write;
+    use gba::prelude::{MgbaBufferedLogger, MgbaMessageLevel};
     let log_level = MgbaMessageLevel::Error;
     if let Ok(mut logger) = MgbaBufferedLogger::try_new(log_level) {
         writeln!(logger, "Panic, {}", i).ok();
@@ -42,10 +42,17 @@ extern "C" fn main() -> ! {
 
     let mut screen_state = ScreenState::TitleScreen;
 
-    let mut music_player = audio::music::MusicPlayer::take();
+    let mut mixer = audio::mixer::AudioMixer::take();
+    let bgm = audio::mixer::AudioSource::new(
+        audio::assets::BACKGROUND_MUSIC,
+        audio::mixer::AudioVolume::new(45),
+        true,
+    );
+
+    mixer.set_channel_1(bgm);
 
     // Top-level game loop just runs the currently active screen until it transitions.
     loop {
-        screen_state = screen_state.exec_screen(&gba, &mut music_player);
+        screen_state = screen_state.exec_screen(&gba, &mut mixer);
     }
 }
