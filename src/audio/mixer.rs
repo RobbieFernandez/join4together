@@ -149,8 +149,8 @@ impl AudioMixer {
                 for (i, sample) in next_buffer.iter().enumerate() {
                     // The buffers are represented as u8, but the data is actually i8
                     // So reinterpret the data as i8 before these shifts.
-                    let sample: i8 = unsafe { core::mem::transmute(*sample) };
-                    let buffered: i8 = unsafe { core::mem::transmute(back_buffer[i]) };
+                    let sample: i8 = i8::from_ne_bytes([*sample]);
+                    let buffered: i8 = i8::from_ne_bytes([back_buffer[i]]);
                     let buffered: i16 = buffered.into();
 
                     // Store samples in i16 before mixing, then clip afterwards.
@@ -161,15 +161,11 @@ impl AudioMixer {
                     let mut mixed: i16 = buffered + sample;
 
                     // Clip to i8
-                    if mixed > i8::MAX.into() {
-                        mixed = i8::MAX.into();
-                    } else if mixed < i8::MIN.into() {
-                        mixed = i8::MIN.into();
-                    }
+                    mixed = mixed.clamp(i8::MIN.into(), i8::MAX.into());
 
                     // Reinterpret as u8 before writing it to the buffer.
                     let mixed: i8 = mixed.try_into().unwrap();
-                    let mixed: u8 = unsafe { core::mem::transmute(mixed) };
+                    let mixed: u8 = mixed.to_ne_bytes()[0];
 
                     back_buffer[i] = mixed;
                 }
