@@ -5,6 +5,7 @@ extern "C" fn irq_handler(irq: IrqBits) {
 
     if irq.vblank() {
         super::gba::update_input();
+        crate::audio::mixer::swap_buffers();
         handled_interrupts = handled_interrupts.with_vblank(true);
     }
 
@@ -17,4 +18,14 @@ pub fn init_irq() {
     IME.write(true);
 
     RUST_IRQ_HANDLER.write(Some(irq_handler));
+}
+
+pub fn critical_section<F>(body: F)
+where
+    F: FnOnce() -> (),
+{
+    let enabled = IME.read();
+    IME.write(false);
+    body();
+    IME.write(enabled);
 }

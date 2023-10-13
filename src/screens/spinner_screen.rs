@@ -1,7 +1,7 @@
 use gba::{prelude::TIMER3_COUNT, random::Lcg32};
 
 use crate::{
-    audio::{drum_roll::DrumRoll, mixer::AudioMixer},
+    audio::drum_roll::DrumRoll,
     graphics::effects::spinner::Spinner,
     graphics::{
         background::{BackgroundLayer, LoadedBackground, SCROLLER_BACKGROUND, SPINNER_BACKGROUND},
@@ -91,7 +91,7 @@ impl<'a> SpinnerScreenLoadedData<'a> {
 }
 
 impl<'a> Screen for SpinnerScreen<'a> {
-    fn update(&mut self, _mixer: &mut AudioMixer) -> Option<super::ScreenState> {
+    fn update(&mut self) -> Option<super::ScreenState> {
         self.background_scroller.update();
 
         self.background_scroller

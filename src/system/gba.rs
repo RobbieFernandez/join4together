@@ -1,5 +1,6 @@
 use core::mem::size_of;
 
+use crate::audio::mixer;
 use crate::audio::noise::enable_noise;
 
 use super::irq::init_irq;
@@ -124,6 +125,8 @@ impl GBA {
         // Turn on the sound chip.
         SOUND_ENABLED.write(SoundEnable::new().with_enabled(true));
         enable_noise();
+
+        mixer::init_mixer();
 
         init_irq();
     }

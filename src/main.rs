@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+use audio::mixer;
 use graphics::sprite::OBJ_PALETTE;
 
 use screens::ScreenState;
@@ -42,17 +43,16 @@ extern "C" fn main() -> ! {
 
     let mut screen_state = ScreenState::TitleScreen;
 
-    let mut mixer = audio::mixer::AudioMixer::take();
     let bgm = audio::mixer::AudioSource::new(
         audio::assets::BACKGROUND_MUSIC,
         audio::mixer::AudioVolume::new(45),
         true,
     );
 
-    mixer.set_channel_1(bgm);
+    mixer::set_channel_1(bgm);
 
     // Top-level game loop just runs the currently active screen until it transitions.
     loop {
-        screen_state = screen_state.exec_screen(&gba, &mut mixer);
+        screen_state = screen_state.exec_screen(&gba);
     }
 }
