@@ -2,7 +2,11 @@
 install_script = '''
 if ! command -v arm-none-eabi-ld > /dev/null
 then
-    sudo apt install binutils-arm-none-eabi
+    echo ""
+    echo "     ERROR: Command arm-none-eabi-ld not found."
+    echo "            This is likely available in a package named something similar to arm-binutils."
+    echo ""
+    exit 1
 fi
 '''
 
@@ -14,6 +18,7 @@ install_crate = { rustup_component_name = "rust-src" }
 condition = { profiles = ["development"] }
 dependencies = ["arm-binutils", "rust_src"]
 command = "cargo"
+env = { "PROFILE" = "debug" }
 args = ["build"]
 
 
@@ -21,6 +26,7 @@ args = ["build"]
 condition = { profiles = ["release"] }
 dependencies = ["arm-binutils", "rust_src"]
 command = "cargo"
+env = { "PROFILE" = "release" }
 args = ["build", "--release"]
 
 
@@ -29,7 +35,7 @@ command = "arm-none-eabi-objcopy"
 args = [
     "-O",
     "binary",
-    "target/thumbv4t-none-eabi/release/join4together",
+    "target/thumbv4t-none-eabi/${PROFILE}/join4together",
     "join4together.gba"
 ]
 dependencies = ["build-dev", "build-release"]
