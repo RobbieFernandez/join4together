@@ -60,7 +60,7 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
     }
 
     pub fn request_aligned_memory(
-        &'a self,
+        &self,
         alignment: usize,
         aligned_chunks: usize,
     ) -> Result<ClaimedVolRegion<T, R, W, C>, OutOfMemoryError> {
@@ -74,7 +74,7 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
     fn memory_range_to_vol_region(
         &'a self,
         memory_range: ClaimedMemoryRange<'a, C>,
-    ) -> ClaimedVolRegion<T, R, W, C> {
+    ) -> ClaimedVolRegion<'a, T, R, W, C> {
         ClaimedVolRegion::new(&self.block, memory_range)
     }
 }

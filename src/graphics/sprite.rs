@@ -120,7 +120,7 @@ impl<'a> LoadedObjectEntry<'a> {
         &mut self.obj_attr
     }
 
-    pub fn loaded_sprite(&'a self) -> &'a LoadedSprite {
+    pub fn loaded_sprite(&self) -> &LoadedSprite {
         self.sprite
     }
 
@@ -161,7 +161,7 @@ impl<'a> AffineLoadedObjectEntry<'a> {
         &mut self.loaded_object_entry.obj_attr
     }
 
-    pub fn loaded_sprite(&'a self) -> &'a LoadedSprite {
+    pub fn loaded_sprite(&self) -> &LoadedSprite {
         self.loaded_object_entry.sprite
     }
 }
@@ -187,7 +187,7 @@ impl<const C: usize> Animation<C> {
 }
 
 impl<'a, const C: usize> LoadedAnimation<'a, C> {
-    pub fn get_sprite(&'a self, time: u16) -> &'a LoadedSprite {
+    pub fn get_sprite(&self, time: u16) -> &LoadedSprite {
         // Convert from time to the sprite index by dividing by tick rate.
         let num_frames: u16 = C.try_into().unwrap();
         let tick_rate: u16 = self.animation.tick_rate.into();
@@ -200,7 +200,7 @@ impl<'a, const C: usize> LoadedAnimation<'a, C> {
         self.get_frame(index)
     }
 
-    pub fn get_frame(&'a self, index: usize) -> &'a LoadedSprite {
+    pub fn get_frame(&self, index: usize) -> &LoadedSprite {
         &self.loaded_sprites[index]
     }
 

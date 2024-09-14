@@ -84,7 +84,7 @@ impl<
     }
 
     pub fn request_aligned_memory(
-        &'a self,
+        &self,
         alignment: usize,
         aligned_chunks: usize,
     ) -> Result<ClaimedGridFrames<T, R, W, WIDTH, HEIGHT, FRAMES, BYTE_STRIDE>, OutOfMemoryError>
