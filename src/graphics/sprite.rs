@@ -19,7 +19,7 @@ pub struct Sprite {
 
 pub struct LoadedSprite<'a> {
     sprite: &'a Sprite,
-    memory: ClaimedVolRegion<'a, Tile4, Safe, Safe, 1024>,
+    memory: ClaimedVolRegion<'a, Tile4, Safe, Safe>,
 }
 
 pub struct Animation<const C: usize> {

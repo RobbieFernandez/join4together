@@ -1,49 +1,55 @@
-use core::{cell::RefCell, ops::Range};
+use core::{cell::RefCell, marker::PhantomData, ops::Range};
 
 use super::error::OutOfMemoryError;
 
-struct FreeMemoryRange<'a, const C: usize> {
-    allocation_arr: &'a RefCell<[bool; C]>,
+struct FreeMemoryRange<'a> {
     start: usize,
     length: usize,
+    alloc_marker_ptr: *mut bool,
+    phantom: PhantomData<&'a bool>
 }
 
-pub struct ClaimedMemoryRange<'a, const C: usize> {
-    allocation_arr: &'a RefCell<[bool; C]>,
+pub struct ClaimedMemoryRange<'a> {
     start: usize,
     length: usize,
+    alloc_marker_ptr: *mut bool,
+    phantom: PhantomData<&'a bool>
 }
 
 pub struct ContiguousMemoryTracker<const C: usize> {
     allocation_arr: RefCell<[bool; C]>,
 }
 
-impl<'a, const C: usize> FreeMemoryRange<'a, C> {
-    fn into_claimed(self) -> ClaimedMemoryRange<'a, C> {
-        ClaimedMemoryRange::new(self.allocation_arr, self.start, self.length)
+impl<'a> FreeMemoryRange<'a> {
+    /// Claim this memory region
+    /// 
+    /// # Safety 
+    /// You must ensure that no other FreeMemoryRange exists that overlaps this one.
+    unsafe fn into_claimed(self) -> ClaimedMemoryRange<'a> {
+        ClaimedMemoryRange::new(self.start, self.length, self.alloc_marker_ptr)
     }
 }
 
-impl<'a, const C: usize> ClaimedMemoryRange<'a, C> {
-    // Claim this memory range, preventing the memory manager from
-    // allocating it again until the object is dropped.
-    fn new(
-        allocation_arr_cell: &'a RefCell<[bool; C]>,
+impl<'a> ClaimedMemoryRange<'a> {
+    /// Claim this memory range, preventing the memory manager from
+    /// allocating it again until the object is dropped.
+    /// 
+    /// # Safety
+    /// You must ensure no other ClaimedMemoryRange exists that overlap with this one.
+    unsafe fn new(
         start: usize,
         length: usize,
-    ) -> ClaimedMemoryRange<'a, C> {
-        let mut allocation_arr = allocation_arr_cell.borrow_mut();
-
-        for i in start..(start + length) {
-            let e = allocation_arr.get_mut(i).unwrap();
-            assert!(!(*e));
-            *e = true;
+        alloc_marker_ptr: *mut bool,
+    ) -> ClaimedMemoryRange<'a> {
+        for i in 0..length {
+            alloc_marker_ptr.add(i).write(true)
         }
 
         ClaimedMemoryRange {
-            allocation_arr: allocation_arr_cell,
+            alloc_marker_ptr,
             start,
             length,
+            phantom: PhantomData,
         }
     }
 
@@ -62,14 +68,14 @@ impl<'a, const C: usize> ClaimedMemoryRange<'a, C> {
     }
 }
 
-impl<'a, const C: usize> Drop for ClaimedMemoryRange<'a, C> {
+impl<'a> Drop for ClaimedMemoryRange<'a> {
     fn drop(&mut self) {
-        let mut allocation_arr = self.allocation_arr.borrow_mut();
-
-        for i in self.start..(self.start + self.length) {
-            let e = allocation_arr.get_mut(i).unwrap();
-            assert!(*e);
-            *e = false;
+        // The pointer is sourced from the memory tracker, and the lifetime guarantees
+        // that the tracker outlives this range. So the pointers should always be valid
+        unsafe {
+            for i in 0..self.length {
+                self.alloc_marker_ptr.add(i).write(false)
+            }    
         }
     }
 }
@@ -85,7 +91,7 @@ impl<'a, const C: usize> ContiguousMemoryTracker<C> {
         &self,
         alignment: usize,
         requested_aligned_chunks: usize,
-    ) -> Result<FreeMemoryRange<C>, OutOfMemoryError> {
+    ) -> Result<FreeMemoryRange, OutOfMemoryError> {
         let mut chunk_pos = 0; // The index of the last seen aligned chunk
         let num_chunks = C / alignment;
         let allocation_arr = self.allocation_arr.borrow();
@@ -111,12 +117,20 @@ impl<'a, const C: usize> ContiguousMemoryTracker<C> {
 
             if num_free_chunks >= requested_aligned_chunks {
                 let start_of_range = (chunk_pos + starting_chunk_index) * alignment;
-                let length = requested_aligned_chunks * alignment;
+                let length: usize = requested_aligned_chunks * alignment;
+                
+                // Drop borrow to allow re-borrowing as mutable.
+                // We're about to return so it's ok.
+                drop(allocation_arr);
+
+                let mut allocation_arr = self.allocation_arr.borrow_mut();
+                let allocation_arr_ptr = unsafe { allocation_arr.as_mut_ptr().add(start_of_range) };
 
                 return Ok(FreeMemoryRange {
-                    allocation_arr: &self.allocation_arr,
                     start: start_of_range,
                     length,
+                    phantom: PhantomData,
+                    alloc_marker_ptr: allocation_arr_ptr,
                 });
             }
 
@@ -133,11 +147,13 @@ impl<'a, const C: usize> ContiguousMemoryTracker<C> {
         &'a self,
         alignment: usize,
         aligned_chunks: usize,
-    ) -> Result<ClaimedMemoryRange<'a, C>, OutOfMemoryError> {
-        // This is safe so long as this is the only method that ever constructs
-        // FreeMemoryRanges. The struct itself is private so this assumption holds true.
+    ) -> Result<ClaimedMemoryRange<'a>, OutOfMemoryError> {
         let memory_range = self.find_available_memory_range(alignment, aligned_chunks)?;
 
-        Ok(memory_range.into_claimed())
+        // This is safe so long as this is the only method that ever constructs
+        // FreeMemoryRanges. The struct itself is private so this assumption holds true.
+        unsafe {
+            Ok(memory_range.into_claimed())
+        }
     }
 }

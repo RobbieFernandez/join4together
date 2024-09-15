@@ -16,7 +16,7 @@ pub struct ClaimedGridFrames<
     const BYTE_STRIDE: usize,
 > {
     strided_grid: &'a VolGrid2dStrided<T, R, W, WIDTH, HEIGHT, FRAMES, BYTE_STRIDE>,
-    claimed_memory_range: ClaimedMemoryRange<'a, FRAMES>,
+    claimed_memory_range: ClaimedMemoryRange<'a>,
 }
 
 pub struct MemoryStridedGridManager<

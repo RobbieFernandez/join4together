@@ -5,9 +5,9 @@ use super::{
     error::OutOfMemoryError,
 };
 
-pub struct ClaimedVolRegion<'a, T, R, W, const C: usize> {
+pub struct ClaimedVolRegion<'a, T, R, W> {
     vol_region: VolRegion<T, R, W>,
-    claimed_memory_range: ClaimedMemoryRange<'a, C>,
+    claimed_memory_range: ClaimedMemoryRange<'a>,
 }
 
 pub struct MemoryBlockManager<T, R, W, const C: usize> {
@@ -15,13 +15,13 @@ pub struct MemoryBlockManager<T, R, W, const C: usize> {
     tracker: ContiguousMemoryTracker<C>,
 }
 
-impl<'a, T, R, W, const C: usize> ClaimedVolRegion<'a, T, R, W, C> {
-    fn new(
+impl<'a, T, R, W> ClaimedVolRegion<'a, T, R, W> {
+    fn new<const C: usize>(
         block: &'a VolBlock<T, R, W, C>,
-        claimed_memory_range: ClaimedMemoryRange<'a, C>,
+        claimed_memory_range: ClaimedMemoryRange<'a>,
     ) -> Self {
         let addr_range = claimed_memory_range.address_range();
-        let region = block.as_region();
+        let region: VolRegion<T, R, W> = block.as_region();
 
         Self {
             vol_region: region.sub_slice(addr_range),
@@ -30,7 +30,7 @@ impl<'a, T, R, W, const C: usize> ClaimedVolRegion<'a, T, R, W, C> {
     }
 }
 
-impl<'a, T, R, W, const C: usize> ClaimedVolRegion<'a, T, R, W, C> {
+impl<'a, T, R, W> ClaimedVolRegion<'a, T, R, W> {
     pub fn as_vol_region(&mut self) -> &VolRegion<T, R, W> {
         &self.vol_region
     }
@@ -55,7 +55,7 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
     pub fn request_memory(
         &self,
         size: usize,
-    ) -> Result<ClaimedVolRegion<T, R, W, C>, OutOfMemoryError> {
+    ) -> Result<ClaimedVolRegion<T, R, W>, OutOfMemoryError> {
         self.request_aligned_memory(1, size)
     }
 
@@ -63,7 +63,7 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
         &self,
         alignment: usize,
         aligned_chunks: usize,
-    ) -> Result<ClaimedVolRegion<T, R, W, C>, OutOfMemoryError> {
+    ) -> Result<ClaimedVolRegion<T, R, W>, OutOfMemoryError> {
         let memory_range = self
             .tracker
             .request_aligned_memory(alignment, aligned_chunks)?;
@@ -73,8 +73,8 @@ impl<'a, T, R, W, const C: usize> MemoryBlockManager<T, R, W, C> {
 
     fn memory_range_to_vol_region(
         &'a self,
-        memory_range: ClaimedMemoryRange<'a, C>,
-    ) -> ClaimedVolRegion<'a, T, R, W, C> {
+        memory_range: ClaimedMemoryRange<'a>,
+    ) -> ClaimedVolRegion<'a, T, R, W> {
         ClaimedVolRegion::new(&self.block, memory_range)
     }
 }

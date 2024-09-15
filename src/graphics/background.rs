@@ -37,12 +37,12 @@ pub struct Background {
 pub struct LoadedBackground<'a> {
     background: &'a Background,
     // Memory for the tileset
-    charblock_memory: ClaimedVolRegion<'a, Tile4, Safe, Safe, 512>,
+    charblock_memory: ClaimedVolRegion<'a, Tile4, Safe, Safe>,
     // Memory for the tilemap
     screenblock_memory:
         ClaimedGridFrames<'a, TextEntry, Safe, Safe, 32, 32, 32, SCREENBLOCK_INDEX_OFFSET>,
     // Memory for the palette
-    _palette_memory: ClaimedVolRegion<'a, Color, Safe, Safe, 256>,
+    _palette_memory: ClaimedVolRegion<'a, Color, Safe, Safe>,
     palette_bank: u16,
     layer: BackgroundLayer,
 }
