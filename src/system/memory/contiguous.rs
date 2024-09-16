@@ -6,7 +6,7 @@ struct FreeMemoryRange<'a> {
     start: usize,
     length: usize,
     alloc_marker_ptr: *mut bool,
-    phantom: PhantomData<&'a bool>
+    phantom: PhantomData<&'a ()>
 }
 
 pub struct ClaimedMemoryRange<'a> {

@@ -8,7 +8,7 @@ pub struct AffineMatrix<'a> {
     pub param_b: i16fx8,
     pub param_c: i16fx8,
     pub param_d: i16fx8,
-    memory: ClaimedVolAddress<'a, i16fx8, Safe, Safe, 32>,
+    memory: ClaimedVolAddress<'a, i16fx8, Safe, Safe>,
 }
 
 impl<'a> AffineMatrix<'a> {

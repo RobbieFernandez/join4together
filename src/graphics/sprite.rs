@@ -41,7 +41,7 @@ pub struct AnimationController<'a, const C: usize> {
 }
 
 pub struct LoadedObjectEntry<'a> {
-    slot: ClaimedVolAddress<'a, ObjAttr, Safe, Safe, 128>,
+    slot: ClaimedVolAddress<'a, ObjAttr, Safe, Safe>,
     obj_attr: ObjAttr,
     sprite: &'a LoadedSprite<'a>,
 }
