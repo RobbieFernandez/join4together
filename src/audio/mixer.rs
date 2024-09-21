@@ -59,11 +59,11 @@ impl AudioSource {
 }
 
 impl AudioDoubleBuffer {
-    fn first_buffer_mut<'a>(&'a mut self) -> &'a mut [u8] {
+    fn first_buffer_mut(& mut self) -> & mut [u8] {
         self.0.split_at_mut(AUDIO_BUFFER_SIZE).0
     }
 
-    fn second_buffer_mut<'a>(&'a mut self) -> &'a mut [u8] {
+    fn second_buffer_mut(& mut self) -> & mut [u8] {
         self.0.split_at_mut(AUDIO_BUFFER_SIZE).1
     }
 }
@@ -149,7 +149,7 @@ impl AudioMixer {
                         // Store samples in i16 before mixing, then clip afterwards.
                         let mut sample: i16 = sample.into();
                         let volume: i16 = volume.into();
-                        sample = sample * volume >> 6;
+                        sample = (sample * volume) >> 6;
 
                         let mut mixed: i16 = buffered + sample;
 

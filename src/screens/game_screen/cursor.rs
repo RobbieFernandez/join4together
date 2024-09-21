@@ -68,7 +68,7 @@ impl Cursor {
 
     pub fn move_left(&mut self) {
         let target_col: usize = if self.column == 0 {
-            let num_col: usize = BOARD_COLUMNS.try_into().unwrap();
+            let num_col: usize = BOARD_COLUMNS.into();
             self.speed = CURSOR_MOVEMENT_SPEED_FAST;
             num_col - 1
         } else {
@@ -79,7 +79,7 @@ impl Cursor {
     }
 
     pub fn move_right(&mut self) {
-        let num_columns: usize = BOARD_COLUMNS.try_into().unwrap();
+        let num_columns: usize = BOARD_COLUMNS.into();
         let target_col: usize = (self.column + 1) % num_columns;
 
         if target_col < self.column {

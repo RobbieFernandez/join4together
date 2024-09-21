@@ -441,12 +441,10 @@ impl<'a> GameScreen<'a> {
         let y_pos = state.current_y;
         let obj = self.game_board.get_token_obj_entry_mut(state.obj_index);
 
-        match obj {
-            Some(obj) => {
-                let attr = obj.get_obj_attr_data();
-                attr.0 = attr.0.with_y(y_pos);
-            }
-            None => {}
+        if let Some(obj) = obj { 
+            let attr = obj.get_obj_attr_data();
+            attr.0 = attr.0.with_y(y_pos);
+
         }
     }
 
@@ -454,8 +452,8 @@ impl<'a> GameScreen<'a> {
         if let GameOutcome::Winner(ref mut winner) = &mut game_over_state.outcome {
             winner.blinker.update();
             for i in winner.token_positions {
-                let mut token_obj = self.game_board.get_token_obj_entry_mut(i).as_mut().unwrap();
-                winner.blinker.apply_to_object(&mut token_obj);
+                let token_obj = self.game_board.get_token_obj_entry_mut(i).as_mut().unwrap();
+                winner.blinker.apply_to_object(token_obj);
             }
         }
 

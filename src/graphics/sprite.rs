@@ -192,7 +192,7 @@ impl<'a, const C: usize> LoadedAnimation<'a, C> {
 
         // This will definitely fit into a usize, because the mod guarantees
         // it's <= C, which is a usize.
-        let index: usize = index.try_into().unwrap();
+        let index: usize = index.into();
 
         self.get_frame(index)
     }

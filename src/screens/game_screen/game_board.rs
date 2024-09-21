@@ -73,10 +73,10 @@ impl<'a> GameBoard<'a> {
         column_number: usize,
         row_number: usize,
     ) -> usize {
-        let num_columns: usize = BOARD_COLUMNS.try_into().unwrap();
+        let num_columns: usize = BOARD_COLUMNS.into();
         assert!(column_number < num_columns);
 
-        let num_rows: usize = BOARD_ROWS.try_into().unwrap();
+        let num_rows: usize = BOARD_ROWS.into();
         let column_start = column_number * num_rows;
 
         let cell_index = column_start + row_number;
@@ -97,9 +97,7 @@ impl<'a> GameBoard<'a> {
     ) -> Option<WinningPositions> {
         DIRECTIONS
             .iter()
-            .map(|direction| self.get_connected_line(direction, token_color, column, row))
-            .filter(|l| l.is_some())
-            .map(|l| l.unwrap())
+            .filter_map(|direction| self.get_connected_line(direction, token_color, column, row))
             .next()
     }
 
@@ -125,7 +123,7 @@ impl<'a> GameBoard<'a> {
         let row = self.get_next_free_row(column);
 
         if let Some(row) = row {
-            let num_rows: usize = BOARD_ROWS.try_into().unwrap();
+            let num_rows: usize = BOARD_ROWS.into();
             let column_start = column * num_rows;
             let cell_index = column_start + row;
             new_matrix[cell_index] = Some(token_color);
@@ -156,7 +154,7 @@ impl<'a> GameBoard<'a> {
     }
 
     pub fn get_next_free_row(&self, column_number: usize) -> Option<usize> {
-        let num_rows: usize = BOARD_ROWS.try_into().unwrap();
+        let num_rows: usize = BOARD_ROWS.into();
         let column_start = column_number * num_rows;
         (0..num_rows).find(|i| self.matrix[column_start + i].is_none())
     }
@@ -198,8 +196,8 @@ impl<'a> GameBoard<'a> {
         current_row: usize,
         direction: &Direction,
     ) -> Option<(usize, usize)> {
-        let num_rows: usize = BOARD_ROWS.try_into().unwrap();
-        let num_cols: usize = BOARD_COLUMNS.try_into().unwrap();
+        let num_rows: usize = BOARD_ROWS.into();
+        let num_cols: usize = BOARD_COLUMNS.into();
 
         let is_bottom = current_row == 0;
         let is_top = current_row == num_rows - 1;
@@ -267,7 +265,7 @@ impl<'a> GameBoard<'a> {
     }
 
     fn check_token(&self, column: usize, row: usize) -> Option<TokenColor> {
-        let num_rows: usize = BOARD_ROWS.try_into().unwrap();
+        let num_rows: usize = BOARD_ROWS.into();
         let index = column * num_rows + row;
 
         if index < self.matrix.len() {
@@ -331,9 +329,8 @@ impl<'a> GameBoard<'a> {
         let (positive_connections, positive_distance) =
             self.get_connected_positions(column, row, direction, token_color);
 
-        for i in 0..positive_distance {
-            connected_positions[i + 1] = positive_connections[i];
-        }
+        connected_positions[1..(positive_distance + 1)]
+            .copy_from_slice(&positive_connections[..positive_distance]);
 
         connected_length += positive_distance;
 
@@ -351,16 +348,17 @@ impl<'a> GameBoard<'a> {
             } else {
                 // There are enough new tokens to make this a connected line. Add these new elements to the array and return it
                 let remaining_tokens = 4 - connected_length;
-                for i in 0..remaining_tokens {
-                    connected_positions[connected_length + i] = negative_connections[i];
-                }
+
+                connected_positions[connected_length..(remaining_tokens + connected_length)]
+                    .copy_from_slice(&negative_connections[..remaining_tokens]);
+
                 Some(connected_positions)
             }
         }
     }
 
     fn calculate_index(&self, col: usize, row: usize) -> usize {
-        let num_rows: usize = BOARD_ROWS.try_into().unwrap();
+        let num_rows: usize = BOARD_ROWS.into();
         let column_start = col * num_rows;
 
         column_start + row

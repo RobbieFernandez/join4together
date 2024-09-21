@@ -24,3 +24,9 @@ impl Drop for BlendController {
         BLDALPHA.write([0u8, 0u8].into());
     }
 }
+
+impl Default for BlendController {
+    fn default() -> Self {
+        Self::new()
+    }
+}

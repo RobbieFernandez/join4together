@@ -34,7 +34,7 @@ pub fn generate_sprite_struct_src(
     match num_frames.cmp(&1) {
         Ordering::Equal => {
             let struct_name = format_ident!("{}_SPRITE", sprite.name.to_string());
-            let tile_vec = tile_vecs.get(0).unwrap();
+            let tile_vec = tile_vecs.first().unwrap();
             generate_sprite_struct_code(
                 sprite,
                 struct_name,

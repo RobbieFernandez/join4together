@@ -45,7 +45,7 @@ impl ShadowOAM {
         }
     }
 
-    pub fn request_memory<'a>(&'a self) -> Result<OAMEntry<'a>, OutOfMemoryError> {
+    pub fn request_memory(& self) -> Result<OAMEntry<'_>, OutOfMemoryError> {
         let slot = self.tracker.request_slot()?;
         let obj_attr = &self.mem[slot.index()];
         unsafe {
@@ -68,5 +68,11 @@ impl ShadowOAM {
             let oa = &*self.mem[i].get();
             OBJ_ATTR_ALL.index(i).write(*oa);
         }
+    }
+}
+
+impl Default for ShadowOAM {
+    fn default() -> Self {
+        Self::new()
     }
 }

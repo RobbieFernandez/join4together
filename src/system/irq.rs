@@ -22,7 +22,7 @@ pub fn init_irq() {
 
 pub fn critical_section<F>(body: F)
 where
-    F: FnOnce() -> (),
+    F: FnOnce(),
 {
     let enabled = IME.read();
     IME.write(false);

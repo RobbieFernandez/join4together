@@ -56,7 +56,6 @@ impl<
 }
 
 impl<
-        'a,
         T,
         R,
         W,
