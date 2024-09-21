@@ -34,9 +34,9 @@ impl ScreenState {
         match self {
             ScreenState::TitleScreen => {
                 let loaded_data = title_screen::TitleScreenLoadedData::new(gba);
-                let mut screen = title_screen::TitleScreen::new(gba, &loaded_data);
+                let screen = title_screen::TitleScreen::new(gba, &loaded_data);
 
-                self.screen_loop(&mut screen)
+                self.screen_loop(screen, gba)
             }
             ScreenState::VsCpuScreen(starting_color) => {
                 let cpu_sprites = CpuSprites::new(gba);
@@ -64,8 +64,8 @@ impl ScreenState {
 
     pub fn exec_spinner_screen(&self, gba: &GBA, mode: spinner_screen::SpinnerMode) -> ScreenState {
         let loaded_data = SpinnerScreenLoadedData::new(gba, &mode);
-        let mut screen = SpinnerScreen::new(gba, &loaded_data, mode);
-        self.screen_loop(&mut screen)
+        let screen = SpinnerScreen::new(gba, &loaded_data, mode);
+        self.screen_loop(screen, gba)
     }
 
     pub fn exec_game_screen(
@@ -76,7 +76,7 @@ impl ScreenState {
         starting_color: TokenColor,
     ) -> ScreenState {
         let loaded_data = game_screen::GameScreenLoadedData::new(gba);
-        let mut screen = game_screen::GameScreen::new(
+        let screen = game_screen::GameScreen::new(
             gba,
             &loaded_data,
             red_agent,
@@ -84,19 +84,31 @@ impl ScreenState {
             starting_color,
         );
 
-        self.screen_loop(&mut screen)
+        self.screen_loop(screen, gba)
     }
 
-    fn screen_loop<S: Screen>(&self, screen: &mut S) -> ScreenState {
+    fn screen_loop<S: Screen>(&self, mut screen: S, gba: &GBA) -> ScreenState {
         loop {
-            VBlankIntrWait();
+            self.process_vblank(gba);
             let next_state = screen.update();
-            mixer::fill_next_buffer();
 
             // Break out of the loop when a transition happens.
             if let Some(state) = next_state {
+                self.clear_screen(screen, gba);
                 return state;
             }
         }
+    }
+
+    fn clear_screen<S: Screen>(&self, screen: S, gba: &GBA) {
+        // Drop the screen, to drop all the OAM memory and hide all the objects.
+        drop(screen);
+        self.process_vblank(gba);
+    }
+
+    fn process_vblank(&self, gba: &GBA) {
+        VBlankIntrWait();
+        unsafe { gba.shadow_oam.sync() }
+        mixer::fill_next_buffer();
     }
 }

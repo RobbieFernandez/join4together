@@ -84,7 +84,6 @@ impl CpuTurn {
                         }
 
                         animation_controller.set_hidden();
-                        animation_controller.get_obj_attr_entry().commit_to_memory();
 
                         self.reset();
 

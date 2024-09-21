@@ -6,7 +6,7 @@ use gba::video::{
 use voladdress::Safe;
 
 use super::affine::AffineMatrix;
-use crate::system::gba::{ClaimedVolAddress, ClaimedVolRegion, GBA};
+use crate::system::gba::{ClaimedVolRegion, OAMEntry, GBA};
 
 pub struct Sprite {
     tiles: &'static [Tile4],
@@ -41,8 +41,7 @@ pub struct AnimationController<'a, const C: usize> {
 }
 
 pub struct LoadedObjectEntry<'a> {
-    slot: ClaimedVolAddress<'a, ObjAttr, Safe, Safe>,
-    obj_attr: ObjAttr,
+    oam_entry: OAMEntry<'a>,
     sprite: &'a LoadedSprite<'a>,
 }
 
@@ -85,11 +84,10 @@ impl<'a> LoadedSprite<'a> {
     }
 
     pub fn create_obj_attr_entry(&'a self, gba: &'a GBA) -> LoadedObjectEntry<'a> {
-        let slot = gba.obj_attr_memory.request_slot().expect("Out of OBJRAM");
-        let oa = ObjAttr::new();
+        let oam_entry = gba.shadow_oam.request_memory().expect("Out of OBJRAM");
+
         let mut entry = LoadedObjectEntry {
-            slot,
-            obj_attr: oa,
+            oam_entry,
             sprite: self,
         };
 
@@ -112,12 +110,8 @@ impl<'a> LoadedSprite<'a> {
 }
 
 impl<'a> LoadedObjectEntry<'a> {
-    pub fn commit_to_memory(&mut self) {
-        self.slot.as_vol_address().write(self.obj_attr);
-    }
-
     pub fn get_obj_attr_data(&mut self) -> &mut ObjAttr {
-        &mut self.obj_attr
+        self.oam_entry.get_obj_attr()
     }
 
     pub fn loaded_sprite(&self) -> &LoadedSprite {
@@ -136,6 +130,26 @@ impl<'a> LoadedObjectEntry<'a> {
             affine_matrix,
         }
     }
+
+    pub fn with_visible(mut self) -> Self {
+        self.set_visible();
+        self
+    }
+
+    pub fn set_visible(&mut self) {
+        let oa = self.get_obj_attr_data();
+        oa.set_style(ObjDisplayStyle::Normal)
+    }
+
+    pub fn with_hidden(mut self) -> Self {
+        self.set_hidden();
+        self
+    }
+
+    pub fn set_hidden(&mut self) {
+        let oa = self.get_obj_attr_data();
+        oa.set_style(ObjDisplayStyle::NotDisplayed)
+    }
 }
 
 impl<'a> AffineLoadedObjectEntry<'a> {
@@ -150,29 +164,12 @@ impl<'a> AffineLoadedObjectEntry<'a> {
         &mut self.affine_matrix
     }
 
-    pub fn commit_to_memory(&mut self) {
-        self.loaded_object_entry
-            .slot
-            .as_vol_address()
-            .write(self.loaded_object_entry.obj_attr);
-    }
-
     pub fn get_obj_attr_data(&mut self) -> &mut ObjAttr {
-        &mut self.loaded_object_entry.obj_attr
+        self.loaded_object_entry.get_obj_attr_data()
     }
 
     pub fn loaded_sprite(&self) -> &LoadedSprite {
         self.loaded_object_entry.sprite
-    }
-}
-
-impl<'a> Drop for LoadedObjectEntry<'a> {
-    fn drop(&mut self) {
-        // When we drop the ObjectEntry we should hide it first, otherwise it will stay visible on the screen
-        // until the memory is reused by another object.
-        let obj_attr = self.get_obj_attr_data();
-        obj_attr.0 = obj_attr.0.with_style(ObjDisplayStyle::NotDisplayed);
-        self.commit_to_memory();
     }
 }
 
@@ -242,21 +239,19 @@ impl<'a, const C: usize> AnimationController<'a, C> {
             self.frame_number = (self.frame_number + 1) % C;
         }
 
-        self.get_obj_attr_entry().commit_to_memory();
+        // TODO - This doesn't read very well.
+        // Update the obj attr
+        _ = self.get_obj_attr_entry();
     }
 
     pub fn set_hidden(&mut self) {
         let obj_entry = self.get_obj_attr_entry();
-        let attr = obj_entry.get_obj_attr_data();
-
-        attr.0 = attr.0.with_style(ObjDisplayStyle::NotDisplayed);
+        obj_entry.set_hidden();
     }
 
     pub fn set_visible(&mut self) {
         let obj_entry = self.get_obj_attr_entry();
-        let attr = obj_entry.get_obj_attr_data();
-
-        attr.0 = attr.0.with_style(ObjDisplayStyle::Normal);
+        obj_entry.set_visible();
     }
 }
 

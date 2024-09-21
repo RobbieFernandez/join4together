@@ -6,14 +6,14 @@ struct FreeMemoryRange<'a> {
     start: usize,
     length: usize,
     alloc_marker_ptr: *mut bool,
-    phantom: PhantomData<&'a ()>
+    phantom: PhantomData<&'a ()>,
 }
 
 pub struct ClaimedMemoryRange<'a> {
     start: usize,
     length: usize,
     alloc_marker_ptr: *mut bool,
-    phantom: PhantomData<&'a bool>
+    phantom: PhantomData<&'a bool>,
 }
 
 pub struct ContiguousMemoryTracker<const C: usize> {
@@ -22,8 +22,8 @@ pub struct ContiguousMemoryTracker<const C: usize> {
 
 impl<'a> FreeMemoryRange<'a> {
     /// Claim this memory region
-    /// 
-    /// # Safety 
+    ///
+    /// # Safety
     /// You must ensure that no other FreeMemoryRange exists that overlaps this one.
     unsafe fn into_claimed(self) -> ClaimedMemoryRange<'a> {
         ClaimedMemoryRange::new(self.start, self.length, self.alloc_marker_ptr)
@@ -33,7 +33,7 @@ impl<'a> FreeMemoryRange<'a> {
 impl<'a> ClaimedMemoryRange<'a> {
     /// Claim this memory range, preventing the memory manager from
     /// allocating it again until the object is dropped.
-    /// 
+    ///
     /// # Safety
     /// You must ensure no other ClaimedMemoryRange exists that overlap with this one.
     unsafe fn new(
@@ -75,7 +75,7 @@ impl<'a> Drop for ClaimedMemoryRange<'a> {
         unsafe {
             for i in 0..self.length {
                 self.alloc_marker_ptr.add(i).write(false)
-            }    
+            }
         }
     }
 }
@@ -118,7 +118,7 @@ impl<'a, const C: usize> ContiguousMemoryTracker<C> {
             if num_free_chunks >= requested_aligned_chunks {
                 let start_of_range = (chunk_pos + starting_chunk_index) * alignment;
                 let length: usize = requested_aligned_chunks * alignment;
-                
+
                 // Drop borrow to allow re-borrowing as mutable.
                 // We're about to return so it's ok.
                 drop(allocation_arr);
@@ -152,8 +152,6 @@ impl<'a, const C: usize> ContiguousMemoryTracker<C> {
 
         // This is safe so long as this is the only method that ever constructs
         // FreeMemoryRanges. The struct itself is private so this assumption holds true.
-        unsafe {
-            Ok(memory_range.into_claimed())
-        }
+        unsafe { Ok(memory_range.into_claimed()) }
     }
 }

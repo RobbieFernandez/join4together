@@ -125,7 +125,6 @@ impl<'a> SpinnerScreen<'a> {
         oa.set_y(ARROW_POSITION.1);
 
         arrow_sprite.get_affine_matrix().commit_to_memory();
-        arrow_sprite.commit_to_memory();
 
         let spinner = Spinner::new(0xFFFF, 0x000F);
 
@@ -159,9 +158,6 @@ impl<'a> SpinnerScreen<'a> {
         yellow_player_oa.set_x((SCREEN_WIDTH / 2) + PLAYER_TEXT_X_OFFSET);
         yellow_player_oa.set_y(PLAYER_TEXT_Y_POSITION);
 
-        red_player_obj.commit_to_memory();
-        yellow_player_obj.commit_to_memory();
-
         let blinker = Blinker::new(BLINK_TIME_ON, BLINK_TIME_OFF, false);
         let background_scroller = BackgroundScroller::new(0, 1).with_divisor(2);
 
@@ -194,9 +190,6 @@ impl<'a> SpinnerScreen<'a> {
     fn enter_spinning_state(&mut self) {
         // Hide the press a indicator.
         self.press_a_animation_controller.set_hidden();
-        self.press_a_animation_controller
-            .get_obj_attr_entry()
-            .commit_to_memory();
 
         let seed: u32 = TIMER3_COUNT.read().into();
         let mut rng = Lcg32::new(seed);
@@ -255,7 +248,6 @@ impl<'a> SpinnerScreen<'a> {
 
         self.blinker.update();
         self.blinker.apply_to_object(target_obj);
-        target_obj.commit_to_memory();
 
         let should_transition = state.timer == 0;
 

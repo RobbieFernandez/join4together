@@ -36,12 +36,7 @@ extern "C" fn main() -> ! {
         .expect("Object palette cannot fit in memory.");
 
     let palette_mem_region = palette_mem.as_vol_region();
-
-    for (i, color) in OBJ_PALETTE.iter().enumerate() {
-        palette_mem_region.index(i).write(*color);
-    }
-
-    let mut screen_state = ScreenState::TitleScreen;
+    palette_mem_region.write_from_slice(&OBJ_PALETTE);
 
     let bgm = audio::mixer::AudioSource::new(
         audio::assets::BACKGROUND_MUSIC,
@@ -52,6 +47,7 @@ extern "C" fn main() -> ! {
     mixer::set_channel_1(bgm);
 
     // Top-level game loop just runs the currently active screen until it transitions.
+    let mut screen_state = ScreenState::TitleScreen;
     loop {
         screen_state = screen_state.exec_screen(&gba);
     }

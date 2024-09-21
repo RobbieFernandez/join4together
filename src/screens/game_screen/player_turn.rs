@@ -34,7 +34,6 @@ impl PlayerTurn {
             let col = self.cursor.get_column();
             let row = game_board.get_next_free_row(col);
             anim_controller.set_hidden();
-            anim_controller.get_obj_attr_entry().commit_to_memory();
 
             if let Some(row) = row {
                 // If the player blocks the CPU, then he should be angry.

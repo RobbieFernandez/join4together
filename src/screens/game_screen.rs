@@ -23,7 +23,6 @@ use crate::system::gba::GbaKey;
 use crate::system::{constants::BOARD_SLOTS, gba::GBA};
 use cpu_turn::CpuTurn;
 use game_board::WinningPositions;
-use gba::prelude::ObjDisplayStyle;
 use gba::video::{BlendControl, ColorEffectMode};
 use player_turn::PlayerTurn;
 
@@ -221,9 +220,13 @@ impl<'a> GameScreen<'a> {
         yellow_agent: Agent<'a>,
         starting_color: TokenColor,
     ) -> Self {
-        let red_token_animation_controller = loaded_data.red_token_animation.create_controller(gba);
-        let yellow_token_animation_controller =
+        let mut red_token_animation_controller =
+            loaded_data.red_token_animation.create_controller(gba);
+        let mut yellow_token_animation_controller =
             loaded_data.yellow_token_animation.create_controller(gba);
+
+        red_token_animation_controller.set_hidden();
+        yellow_token_animation_controller.set_hidden();
 
         // Create an Object entry for each slot that makes up the board.
         // We need to keep ownership of these in order to keep them in OBJRAM, so store them in an array.
@@ -238,15 +241,31 @@ impl<'a> GameScreen<'a> {
             loaded_data.yellow_token_animation.get_frame(0),
         );
 
-        let p1_text_object = loaded_data.p1_text_sprite.create_obj_attr_entry(gba);
-        let p2_text_object = loaded_data.p2_text_sprite.create_obj_attr_entry(gba);
-        let cpu_text_object = loaded_data.cpu_text_sprite.create_obj_attr_entry(gba);
-        let red_wins_text_object = loaded_data.red_wins_text_sprite.create_obj_attr_entry(gba);
+        let p1_text_object = loaded_data
+            .p1_text_sprite
+            .create_obj_attr_entry(gba)
+            .with_hidden();
+        let p2_text_object = loaded_data
+            .p2_text_sprite
+            .create_obj_attr_entry(gba)
+            .with_hidden();
+        let cpu_text_object = loaded_data
+            .cpu_text_sprite
+            .create_obj_attr_entry(gba)
+            .with_hidden();
+        let red_wins_text_object = loaded_data
+            .red_wins_text_sprite
+            .create_obj_attr_entry(gba)
+            .with_hidden();
         let yellow_wins_text_object = loaded_data
             .yellow_wins_text_sprite
-            .create_obj_attr_entry(gba);
+            .create_obj_attr_entry(gba)
+            .with_hidden();
 
-        let draw_text_object = loaded_data.draw_text_sprite.create_obj_attr_entry(gba);
+        let draw_text_object = loaded_data
+            .draw_text_sprite
+            .create_obj_attr_entry(gba)
+            .with_hidden();
 
         let _background = BOARD_BACKGROUND.load(gba, BackgroundLayer::Bg0);
         let clouds_background_far = CLOUDS_FAR_BACKGROUND.load(gba, BackgroundLayer::Bg1);
@@ -266,10 +285,18 @@ impl<'a> GameScreen<'a> {
         let cloud_scroller_close = BackgroundScroller::new(1, 0).with_divisor(5);
         let cloud_scroller_far = BackgroundScroller::new(1, 0).with_divisor(8);
 
-        let rematch_text_object = loaded_data.rematch_text_sprite.create_obj_attr_entry(gba);
-        let quit_text_object = loaded_data.quit_text_sprite.create_obj_attr_entry(gba);
-        let menu_cursor_animation_controller =
+        let rematch_text_object = loaded_data
+            .rematch_text_sprite
+            .create_obj_attr_entry(gba)
+            .with_hidden();
+        let quit_text_object = loaded_data
+            .quit_text_sprite
+            .create_obj_attr_entry(gba)
+            .with_hidden();
+        let mut menu_cursor_animation_controller =
             loaded_data.menu_cursor_animation.create_controller(gba);
+
+        menu_cursor_animation_controller.set_hidden();
 
         Self {
             gba,
@@ -418,7 +445,6 @@ impl<'a> GameScreen<'a> {
             Some(obj) => {
                 let attr = obj.get_obj_attr_data();
                 attr.0 = attr.0.with_y(y_pos);
-                obj.commit_to_memory();
             }
             None => {}
         }
@@ -430,7 +456,6 @@ impl<'a> GameScreen<'a> {
             for i in winner.token_positions {
                 let mut token_obj = self.game_board.get_token_obj_entry_mut(i).as_mut().unwrap();
                 winner.blinker.apply_to_object(&mut token_obj);
-                token_obj.commit_to_memory();
             }
         }
 
@@ -464,6 +489,7 @@ impl<'a> GameScreen<'a> {
         let cursor_x = target_obj_x - CURSOR_X_OFFSET;
 
         let cursor_obj = self.menu_cursor_animation_controller.get_obj_attr_entry();
+        cursor_obj.set_visible();
         let cursor_oa = cursor_obj.get_obj_attr_data();
         cursor_oa.set_x(cursor_x);
         self.menu_cursor_animation_controller.tick();
@@ -534,15 +560,13 @@ impl<'a> GameScreen<'a> {
         let oa = winning_player_obj.get_obj_attr_data();
         oa.set_x(player_text_xpos);
         oa.set_y(WIN_TEXT_YPOS);
-        oa.set_style(ObjDisplayStyle::Normal);
-        winning_player_obj.commit_to_memory();
+        winning_player_obj.set_visible();
 
         let wins_text_xpos = player_text_xpos + player_name_width + WIN_TEXT_WORD_SPACING;
         let oa = wins_text_obj.get_obj_attr_data();
         oa.set_x(wins_text_xpos);
         oa.set_y(WIN_TEXT_YPOS);
-        oa.set_style(ObjDisplayStyle::Normal);
-        wins_text_obj.commit_to_memory();
+        wins_text_obj.set_visible();
 
         let game_over_state = GameOverState {
             outcome,
@@ -576,8 +600,7 @@ impl<'a> GameScreen<'a> {
         let oa = self.draw_text_object.get_obj_attr_data();
         oa.set_x(x_pos);
         oa.set_y(WIN_TEXT_YPOS);
-        oa.set_style(ObjDisplayStyle::Normal);
-        self.draw_text_object.commit_to_memory();
+        self.draw_text_object.set_visible();
 
         let game_over_state = GameOverState {
             outcome,
@@ -597,7 +620,7 @@ impl<'a> GameScreen<'a> {
 
         rematch_oa.set_x(rematch_text_xpos);
         rematch_oa.set_y(GAME_OVER_MENU_YPOS);
-        self.rematch_text_object.commit_to_memory();
+        self.rematch_text_object.set_visible();
 
         let rematch_x_center = rematch_text_xpos + (rematch_text_width / 2);
         let rematch_center_offset = SCREEN_CENTER.0 - rematch_x_center;
@@ -608,7 +631,7 @@ impl<'a> GameScreen<'a> {
 
         quit_oa.set_x(quit_text_xpos);
         quit_oa.set_y(GAME_OVER_MENU_YPOS);
-        self.quit_text_object.commit_to_memory();
+        self.quit_text_object.set_visible();
 
         let cursor_height: u16 = MENU_CURSOR_FRAME_0_SPRITE.height().try_into().unwrap();
         let menu_y_center = GAME_OVER_MENU_YPOS + (rematch_text_height / 2);

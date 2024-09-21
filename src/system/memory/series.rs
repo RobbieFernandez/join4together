@@ -1,7 +1,9 @@
 use voladdress::{VolAddress, VolSeries};
 
-use super::{error::OutOfMemoryError, slot::{ClaimedMemorySlot, MemorySlotTracker}};
-
+use super::{
+    error::OutOfMemoryError,
+    slot::{ClaimedMemorySlot, MemorySlotTracker},
+};
 
 pub struct ClaimedVolAddress<'a, T, R, W> {
     memory_slot: ClaimedMemorySlot<'a>,
@@ -13,7 +15,6 @@ pub struct MemorySeriesManager<T, R, W, const C: usize, const S: usize> {
     tracker: MemorySlotTracker<C>,
 }
 
-
 impl<'a, T, R, W> ClaimedVolAddress<'a, T, R, W> {
     pub fn as_vol_address(&mut self) -> &VolAddress<T, R, W> {
         &self.vol_address
@@ -23,10 +24,14 @@ impl<'a, T, R, W> ClaimedVolAddress<'a, T, R, W> {
         self.memory_slot.index()
     }
 
-    fn from_claimed_slot<const C: usize, const S: usize>(memory_slot: ClaimedMemorySlot<'a>, vol_series: VolSeries<T, R, W, C, S>) -> Self {
+    fn from_claimed_slot<const C: usize, const S: usize>(
+        memory_slot: ClaimedMemorySlot<'a>,
+        vol_series: VolSeries<T, R, W, C, S>,
+    ) -> Self {
         let vol_address = vol_series.index(memory_slot.index());
         Self {
-            vol_address, memory_slot
+            vol_address,
+            memory_slot,
         }
     }
 }
@@ -35,7 +40,7 @@ impl<T, R, W, const C: usize, const S: usize> MemorySeriesManager<T, R, W, C, S>
     pub fn new(series: VolSeries<T, R, W, C, S>) -> Self {
         Self {
             series,
-            tracker: MemorySlotTracker::new()
+            tracker: MemorySlotTracker::new(),
         }
     }
 

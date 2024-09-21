@@ -93,7 +93,6 @@ impl<'a> CpuFace<'a> {
             let oa = obj.get_obj_attr_data();
             oa.0 = oa.0.with_y(y_pos);
             oa.1 = oa.1.with_x(x_pos);
-            obj.commit_to_memory();
         }
 
         Self {
@@ -107,14 +106,12 @@ impl<'a> CpuFace<'a> {
     pub fn set_emotion(&mut self, emotion: CpuEmotion) {
         let face_sprite = self.cpu_sprites.get_face_sprite(emotion);
         face_sprite.store_in_obj_entry(&mut self.cpu_face_obj);
-        self.cpu_face_obj.commit_to_memory();
     }
 
     pub fn set_x(&mut self, x: u16) {
         for obj in [&mut self.cpu_face_obj, &mut self.cpu_head_obj] {
             let oa = obj.get_obj_attr_data();
             oa.set_x(x);
-            obj.commit_to_memory();
         }
     }
 
@@ -122,7 +119,6 @@ impl<'a> CpuFace<'a> {
         for obj in [&mut self.cpu_face_obj, &mut self.cpu_head_obj] {
             let oa = obj.get_obj_attr_data();
             oa.set_y(x);
-            obj.commit_to_memory();
         }
     }
 }

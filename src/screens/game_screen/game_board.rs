@@ -173,6 +173,7 @@ impl<'a> GameBoard<'a> {
         let cell_index = self.calculate_index(col, row);
 
         let x_pos = get_token_x_position(col);
+        let y_pos = get_token_y_position();
 
         let sprite = match token_color {
             TokenColor::Red => self.red_token_sprite,
@@ -184,6 +185,7 @@ impl<'a> GameBoard<'a> {
 
         let attr = obj.get_obj_attr_data();
         attr.1 = attr.1.with_x(x_pos);
+        attr.0 = attr.0.with_y(y_pos);
 
         obj_slot.replace(obj);
 
@@ -388,8 +390,6 @@ pub fn create_board_object_entries<'a>(
         obj_attrs.0 = obj_attrs.0.with_y(start_y + row * board_slot_height);
         obj_attrs.1 = obj_attrs.1.with_x(start_x + col * board_slot_width);
         obj_attrs.2 = obj_attrs.2.with_priority(0);
-
-        obj_entry.commit_to_memory();
 
         obj_entry
     })

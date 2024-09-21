@@ -6,12 +6,14 @@ use crate::audio::noise::enable_noise;
 use super::irq::init_irq;
 use super::memory::block::MemoryBlockManager;
 use super::memory::series::MemorySeriesManager;
+use super::memory::shadow_oam::ShadowOAM;
 use super::memory::strided_grid::MemoryStridedGridManager;
 use gba::prelude::*;
 use voladdress::Safe;
 
 pub use super::memory::block::ClaimedVolRegion;
 pub use super::memory::series::ClaimedVolAddress;
+pub use super::memory::shadow_oam::OAMEntry;
 pub use super::memory::strided_grid::ClaimedGridFrames;
 
 pub type PaletteMemory = MemoryBlockManager<Color, Safe, Safe, 256>;
@@ -32,11 +34,11 @@ pub const CHARBLOCK_BASE: u16 = 3;
 pub struct GBA {
     pub obj_palette_memory: PaletteMemory,
     pub bg_palette_memory: PaletteMemory,
-    pub obj_attr_memory: ObjAttrMemory,
     pub obj_tile_memory: ObjTileMemory,
     pub charblock_memory: CharblockMemory,
     pub screenblock_memory: ScreenblockMemory,
     pub affine_object_matrix_memory: AffineObjectMatrixMemory,
+    pub shadow_oam: ShadowOAM,
 }
 
 pub enum GbaKey {
@@ -70,8 +72,8 @@ impl GBA {
         let mut gba = GBA {
             bg_palette_memory: PaletteMemory::new(BG_PALETTE),
             obj_palette_memory: PaletteMemory::new(OBJ_PALETTE),
-            obj_attr_memory: ObjAttrMemory::new(OBJ_ATTR_ALL),
             obj_tile_memory: ObjTileMemory::new(OBJ_TILES),
+            shadow_oam: ShadowOAM::new(),
 
             // Screenblocks and charblocks occupy the same region in memory, so we need to make sure we don't
             // try to allocate overlapping addressed for Tilemaps/Tilesets.

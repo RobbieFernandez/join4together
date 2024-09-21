@@ -126,14 +126,12 @@ impl<'a> TitleScreen<'a> {
         let press_oa = press_text_object.get_obj_attr_data();
         press_oa.set_x(85);
         press_oa.set_y(MENU_TEXT_Y);
-        press_text_object.commit_to_memory();
 
         let mut start_text_object = loaded_data.start_text_sprite.create_obj_attr_entry(gba);
 
         let start_oa = start_text_object.get_obj_attr_data();
         start_oa.set_x(120);
         start_oa.set_y(MENU_TEXT_Y);
-        start_text_object.commit_to_memory();
 
         let mut vs_cpu_text_object = loaded_data.vs_cpu_text_sprite.create_obj_attr_entry(gba);
         let vs_cpu_sprite_width: u16 = loaded_data
@@ -147,7 +145,6 @@ impl<'a> TitleScreen<'a> {
         vs_cpu_oa.set_style(ObjDisplayStyle::NotDisplayed);
         vs_cpu_oa.set_x(SCREEN_WIDTH / 4 - vs_cpu_sprite_width / 2 + MENU_TEXT_HORIZ_MARGIN);
         vs_cpu_oa.set_y(MENU_TEXT_Y);
-        vs_cpu_text_object.commit_to_memory();
 
         let mut vs_player_text_object =
             loaded_data.vs_player_text_sprite.create_obj_attr_entry(gba);
@@ -165,17 +162,11 @@ impl<'a> TitleScreen<'a> {
         );
         vs_player_oa.set_y(MENU_TEXT_Y);
 
-        vs_player_text_object.commit_to_memory();
-
         let mut cursor_animation_controller = loaded_data.cursor_animation.create_controller(gba);
         cursor_animation_controller.set_hidden();
         let cursor_obj = cursor_animation_controller.get_obj_attr_entry();
         let cursor_oa = cursor_obj.get_obj_attr_data();
         cursor_oa.set_y(MENU_TEXT_Y + 2);
-
-        cursor_animation_controller
-            .get_obj_attr_entry()
-            .commit_to_memory();
 
         let state = TitleScreenState::PressStart(PressStartState {
             blinker: Blinker::new(BLINK_TIME_ON, BLINK_TIME_OFF, true),
@@ -211,9 +202,6 @@ impl<'a> TitleScreen<'a> {
         press_start_state
             .blinker
             .apply_to_object(&mut self.start_text_object);
-
-        self.press_text_object.commit_to_memory();
-        self.start_text_object.commit_to_memory();
 
         self.state = TitleScreenState::PressStart(press_start_state);
 
@@ -272,7 +260,6 @@ impl<'a> TitleScreen<'a> {
         ] {
             let oa = obj.get_obj_attr_data();
             oa.set_style(ObjDisplayStyle::Normal);
-            obj.commit_to_memory();
         }
 
         self.state = TitleScreenState::Menu(menu_state)
@@ -327,7 +314,6 @@ impl<'a> TitleScreen<'a> {
         for obj in [&mut self.press_text_object, &mut self.start_text_object] {
             let oa = obj.get_obj_attr_data();
             oa.set_style(ObjDisplayStyle::NotDisplayed);
-            obj.commit_to_memory();
         }
     }
 
